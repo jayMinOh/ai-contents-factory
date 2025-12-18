@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # MariaDB Database
+  mariadb:
+    image: mariadb:11-jammy
+    container_name: aivm-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_USER: aivm
+      MYSQL_PASSWORD: aivm_dev_password
+      MYSQL_DATABASE: ai_video_marketing
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Celery and Caching
+  redis:
+    image: redis:7-alpine
+    container_name: aivm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: aivm-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+
+  # MinIO (S3-compatible storage for local dev)
+  minio:
+    image: minio/minio:latest
+    container_name: aivm-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  mariadb_data:
+  redis_data:
+  qdrant_data:
+  minio_data:
