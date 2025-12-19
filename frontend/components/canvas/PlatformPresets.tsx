@@ -100,7 +100,7 @@ export default function PlatformPresets({
   className = "",
 }: PlatformPresetsProps) {
   const [expandedPlatforms, setExpandedPlatforms] = useState<Set<PlatformCategory>>(
-    new Set(["instagram"])
+    new Set<PlatformCategory>(["instagram"])
   );
 
   // Toggle platform expansion

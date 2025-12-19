@@ -25,8 +25,9 @@ import FabricCanvas, { FabricCanvasRef } from "./FabricCanvas";
 import TextToolbar from "./TextToolbar";
 import LayerPanel from "./LayerPanel";
 import CanvasExportPanel from "./CanvasExportPanel";
-import type { TextLayer, CanvasState, CanvasSizePreset, ExportOptions } from "@/types/canvas";
+import type { TextLayer, CanvasState, CanvasSizePreset, ExportOptions, PlatformExportPreset, ImageExportOptions } from "@/types/canvas";
 import { CANVAS_SIZE_PRESETS } from "@/types/canvas";
+import { performBatchExport } from "@/lib/canvas/platformPresets";
 
 interface CanvasTextEditorProps {
   initialWidth?: number;
@@ -290,6 +291,27 @@ export default function CanvasTextEditor({
     };
   }, [canvasSize, backgroundColor]);
 
+  // Batch export handler
+  const handleBatchExport = useCallback(
+    async (presets: PlatformExportPreset[], options: ImageExportOptions) => {
+      if (!canvasRef.current) {
+        toast.error("캔버스가 준비되지 않았습니다");
+        return;
+      }
+
+      const canvasExportFn = (width: number, height: number, opts: ImageExportOptions) => {
+        return canvasRef.current!.exportAsImage({
+          format: opts.format,
+          quality: opts.quality / 100,
+          multiplier: opts.multiplier,
+        });
+      };
+
+      await performBatchExport(canvasExportFn, presets, options);
+    },
+    []
+  );
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -473,6 +495,9 @@ export default function CanvasTextEditor({
               onLoadState={handleLoadState}
               onSetBackgroundImage={handleSetBackgroundImage}
               getCanvasState={getCanvasState}
+              onBatchExport={handleBatchExport}
+              canvasWidth={canvasSize.width}
+              canvasHeight={canvasSize.height}
             />
           </div>
         </div>

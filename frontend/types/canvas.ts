@@ -93,7 +93,7 @@ export const GOOGLE_FONTS: FontOption[] = [
 export const ALL_FONTS: FontOption[] = [...SYSTEM_FONTS, ...GOOGLE_FONTS];
 
 // Export format options
-export type ExportFormat = "png" | "jpeg" | "json";
+export type ExportFormat = "png" | "jpeg" | "webp" | "json";
 
 export interface ExportOptions {
   format: ExportFormat;
