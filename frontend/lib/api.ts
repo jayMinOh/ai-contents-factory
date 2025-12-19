@@ -511,6 +511,49 @@ export interface ExtendedVideoGenerationResponse {
   operation_id?: string;
 }
 
+// ========== SNS API Types ==========
+
+export interface SNSParseRequest {
+  url: string;
+}
+
+export interface SNSParseResponse {
+  platform: string;
+  post_id: string | null;
+  pin_id: string | null;
+  url: string;
+  valid: boolean;
+}
+
+export interface SNSImageInfo {
+  url: string;
+  size: number;
+  format: string;
+}
+
+export interface SNSDownloadRequest {
+  url: string;
+}
+
+export interface SNSDownloadResponse {
+  platform: string;
+  images: SNSImageInfo[];
+  success: boolean;
+  error_message: string | null;
+}
+
+export interface SNSExtractImagesRequest {
+  url: string;
+}
+
+export interface SNSExtractImagesResponse {
+  images: string[];  // base64 encoded
+  count: number;
+  success: boolean;
+  platform: string;
+  error_message: string | null;
+}
+
 // ========== Studio API ==========
 
 export const studioApi = {
@@ -836,6 +879,26 @@ export const studioApi = {
     const response = await api.get(
       `/studio/projects/${projectId}/video/extended-status${params}`
     );
+    return response.data;
+  },
+
+  // ========== SNS API Methods ==========
+
+  // Parse SNS URL to extract platform and post information
+  parseSNSUrl: async (url: string): Promise<SNSParseResponse> => {
+    const response = await api.post("/studio/sns/parse", { url });
+    return response.data;
+  },
+
+  // Download media from SNS URL
+  downloadSNSMedia: async (url: string): Promise<SNSDownloadResponse> => {
+    const response = await api.post("/studio/sns/download", { url });
+    return response.data;
+  },
+
+  // Extract images from SNS URL as base64
+  extractSNSImages: async (url: string): Promise<SNSExtractImagesResponse> => {
+    const response = await api.post("/studio/sns/extract-images", { url });
     return response.data;
   },
 };

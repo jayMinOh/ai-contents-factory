@@ -46,6 +46,15 @@ from app.schemas.studio import (
     VideoProjectSummary,
     VideoProjectUpdate,
 )
+from app.schemas.sns import (
+    SNSDownloadRequest,
+    SNSDownloadResponse,
+    SNSExtractImagesRequest,
+    SNSExtractImagesResponse,
+    SNSImageInfo,
+    SNSParseRequest,
+    SNSParseResponse,
+)
 
 router = APIRouter()
 
@@ -2689,6 +2698,203 @@ async def generate_extended_video(
             scenes_processed=0,
             generation_time_ms=generation_time_ms,
             error_message=str(e),
+        )
+
+
+# ========== SNS Parsing and Media Download Endpoints ==========
+
+
+@router.post("/sns/parse", response_model=SNSParseResponse)
+async def parse_sns_url(request: SNSParseRequest):
+    """
+    Parse an SNS URL and extract metadata.
+
+    Supports Instagram, Facebook, and Pinterest URLs.
+    Returns platform information, post/pin IDs, and validation status.
+    """
+    from app.services.sns_parser import SNSParser, SNSParseError
+
+    parser = SNSParser()
+
+    try:
+        # Check if URL is valid first
+        is_valid = parser.is_valid_url(request.url)
+
+        if not is_valid:
+            return SNSParseResponse(
+                platform="unknown",
+                post_id=None,
+                pin_id=None,
+                url=request.url,
+                valid=False,
+            )
+
+        # Parse the URL to get detailed information
+        parsed = await parser.parse_url(request.url)
+
+        return SNSParseResponse(
+            platform=parsed.get("platform", "unknown"),
+            post_id=parsed.get("post_id"),
+            pin_id=parsed.get("pin_id"),
+            url=parsed.get("url", request.url),
+            valid=True,
+        )
+
+    except SNSParseError as e:
+        logger.warning(f"SNS parse error for URL {request.url}: {str(e)}")
+        return SNSParseResponse(
+            platform="unknown",
+            post_id=None,
+            pin_id=None,
+            url=request.url,
+            valid=False,
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error parsing SNS URL {request.url}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to parse URL: {str(e)}",
+        )
+
+
+@router.post("/sns/download", response_model=SNSDownloadResponse)
+async def download_sns_media(request: SNSDownloadRequest):
+    """
+    Download media from an SNS URL.
+
+    Downloads images and videos from Instagram, Facebook, or Pinterest posts.
+    Returns metadata about downloaded files including paths, sizes, and formats.
+    """
+    import os
+    import tempfile
+
+    from app.services.sns_media_downloader import SNSMediaDownloader, SNSMediaDownloadError
+
+    downloader = SNSMediaDownloader()
+
+    try:
+        # Validate URL first
+        if not downloader.is_valid_url(request.url):
+            return SNSDownloadResponse(
+                platform="unknown",
+                images=[],
+                success=False,
+                error_message="Invalid or unsupported SNS URL",
+            )
+
+        # Detect platform
+        metadata = await downloader.extract_metadata(request.url)
+        platform = metadata.get("platform", "unknown")
+
+        # Create temporary directory for downloads
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = await downloader.download(request.url, temp_dir)
+
+            # Build image info list
+            images = []
+            for image_path in result.get("images", []):
+                if os.path.exists(image_path):
+                    file_size = os.path.getsize(image_path)
+                    _, ext = os.path.splitext(image_path)
+                    file_format = ext.lstrip(".").lower() if ext else "unknown"
+
+                    images.append(
+                        SNSImageInfo(
+                            url=image_path,
+                            size=file_size,
+                            format=file_format,
+                        )
+                    )
+
+            return SNSDownloadResponse(
+                platform=platform,
+                images=images,
+                success=True,
+                error_message=None,
+            )
+
+    except SNSMediaDownloadError as e:
+        logger.warning(f"SNS download error for URL {request.url}: {str(e)}")
+        return SNSDownloadResponse(
+            platform="unknown",
+            images=[],
+            success=False,
+            error_message=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error downloading from SNS URL {request.url}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to download media: {str(e)}",
+        )
+
+
+@router.post("/sns/extract-images", response_model=SNSExtractImagesResponse)
+async def extract_sns_images(request: SNSExtractImagesRequest):
+    """
+    Extract images from an SNS URL and return as base64-encoded strings.
+
+    Downloads images from Instagram, Facebook, or Pinterest posts,
+    then converts them to base64 for direct use in frontend or further processing.
+    """
+    import base64
+    import tempfile
+
+    from app.services.sns_media_downloader import SNSMediaDownloader, SNSMediaDownloadError
+
+    downloader = SNSMediaDownloader()
+
+    try:
+        # Validate URL first
+        if not downloader.is_valid_url(request.url):
+            return SNSExtractImagesResponse(
+                images=[],
+                count=0,
+                success=False,
+                platform=None,
+                error_message="Invalid or unsupported SNS URL",
+            )
+
+        # Detect platform
+        metadata = await downloader.extract_metadata(request.url)
+        platform = metadata.get("platform", "unknown")
+
+        # Create temporary directory and extract images
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_bytes_list = await downloader.extract_images_from_post(
+                request.url,
+                temp_dir,
+            )
+
+            # Convert to base64
+            base64_images = []
+            for image_bytes in image_bytes_list:
+                if image_bytes and isinstance(image_bytes, bytes):
+                    base64_str = base64.b64encode(image_bytes).decode("utf-8")
+                    base64_images.append(base64_str)
+
+            return SNSExtractImagesResponse(
+                images=base64_images,
+                count=len(base64_images),
+                success=True,
+                platform=platform,
+                error_message=None,
+            )
+
+    except SNSMediaDownloadError as e:
+        logger.warning(f"SNS image extraction error for URL {request.url}: {str(e)}")
+        return SNSExtractImagesResponse(
+            images=[],
+            count=0,
+            success=False,
+            platform=None,
+            error_message=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error extracting images from SNS URL {request.url}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to extract images: {str(e)}",
         )
 
 
