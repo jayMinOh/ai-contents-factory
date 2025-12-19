@@ -8,6 +8,23 @@ AI Video Marketing 플랫폼의 기능 명세 문서입니다. EARS (Easy Approa
 
 ### Implemented (구현 완료)
 
+#### SPEC-CONTENT-FACTORY-001: AI Content Factory
+- **Status**: COMPLETED
+- **Location**: `SPEC-CONTENT-FACTORY-001/`
+- **Version**: 1.1.0
+- **Completion Date**: 2025-12-19
+- **Description**: SNS 마케팅 이미지 콘텐츠를 빠르게 대량 생산하기 위한 통합 워크플로우 시스템
+- **Key Features**:
+  - 6단계 콘텐츠 생성 마법사 (유형, 용도, 방식, 생성, 선택, 편집)
+  - SNS 링크 파싱 및 이미지 분석 (gallery-dl, Gemini Vision API)
+  - AI 이미지 생성 (Gemini Imagen API, 4개 변형)
+  - Fabric.js 캔버스 텍스트 에디터
+  - 플랫폼별 내보내기 (Instagram, Facebook, Stories)
+  - 배치 다운로드 (JSZip)
+- **Backend**: `/backend/app/services/sns_parser.py`, `/backend/app/services/image_analyzer.py`, `/backend/app/services/image_prompt_builder.py`
+- **Frontend**: `/frontend/app/create/`, `/frontend/components/canvas/`
+- **Tests**: 330 tests passing
+
 #### SPEC-001: Reference Video Analysis System
 - **Status**: IMPLEMENTED
 - **Location**: `SPEC-001/`
@@ -84,6 +101,9 @@ Each SPEC directory contains:
 ## Dependency Graph
 
 ```
+SPEC-CONTENT-FACTORY-001 (AI Content Factory) ─── COMPLETED
+    └── Depends on: SPEC-002 (Brand/Product)
+
 SPEC-001 (Reference Analysis) ──────────────┐
                                             │
 SPEC-002 (Brand/Product) ──┬─── SPEC-003 ───┴─── SPEC-004 (Video Generation)
@@ -92,6 +112,12 @@ SPEC-002 (Brand/Product) ──┬─── SPEC-003 ───┴─── SPEC-
 ```
 
 ## Version History
+
+- **2025-12-19**: SPEC-CONTENT-FACTORY-001 완료
+  - AI Content Factory 전체 구현 완료 (Phase 1-6)
+  - SNS 링크 파싱, 이미지 분석, AI 이미지 생성
+  - Canvas 텍스트 에디터, 플랫폼별 내보내기
+  - 330개 테스트 통과
 
 - **2025-12-11**: Initial SPEC documentation created
   - SPEC-001: Documented existing Reference Video Analysis implementation

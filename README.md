@@ -1,21 +1,32 @@
 # AI Video Marketing Platform
 
-AI를 활용한 마케팅 영상 제작 솔루션
+AI를 활용한 마케팅 콘텐츠 제작 솔루션
 
 ## 기능
 
-1. **레퍼런스 영상 분석** - 영상 URL을 입력하면 타임라인별 분석, 후킹 포인트, 셀링 포인트 추출
-2. **브랜드 관리** - 브랜드 및 제품 정보를 등록하고 관리
-3. **브랜드 지식베이스** - 브랜드/상품 데이터를 학습하여 RAG 시스템 구축 (예정)
-4. **영상 생성** - 분석 결과와 브랜드 데이터를 기반으로 마케팅 영상 자동 생성 (예정)
+1. **AI Content Factory** - SNS 마케팅 이미지 콘텐츠 대량 생산 워크플로우
+   - 6단계 마법사: 유형 선택, 용도 선택, 생성 방식, AI 이미지 생성, 이미지 선택, 텍스트 편집
+   - SNS 링크 파싱 및 레퍼런스 분석 (Instagram, Facebook)
+   - AI 이미지 생성 (Gemini Imagen API, 4개 변형)
+   - Canvas 텍스트 에디터 (Fabric.js 기반)
+   - 플랫폼별 내보내기 (Instagram Feed, Story, Facebook Feed)
+
+2. **레퍼런스 영상 분석** - 영상 URL을 입력하면 타임라인별 분석, 후킹 포인트, 셀링 포인트 추출
+
+3. **브랜드 관리** - 브랜드 및 제품 정보를 등록하고 관리
+
+4. **브랜드 지식베이스** - 브랜드/상품 데이터를 학습하여 RAG 시스템 구축 (예정)
+
+5. **영상 생성** - 분석 결과와 브랜드 데이터를 기반으로 마케팅 영상 자동 생성 (예정)
 
 ## 기술 스택
 
-- **Frontend**: Next.js 14, React Query, Tailwind CSS, Lucide Icons
-- **Backend**: FastAPI, SQLAlchemy 2.0 (async)
+- **Frontend**: Next.js 14, React Query, Tailwind CSS, Lucide Icons, Fabric.js, JSZip
+- **Backend**: FastAPI, SQLAlchemy 2.0 (async), Pillow
 - **Database**: MariaDB 11, Qdrant (Vector DB), Redis
-- **AI**: Google Gemini
-- **Video**: yt-dlp, FFmpeg, Luma/Runway/HeyGen (예정)
+- **AI**: Google Gemini (Vision API, Imagen API)
+- **SNS Integration**: gallery-dl, yt-dlp
+- **Video**: FFmpeg, Luma/Runway/HeyGen (예정)
 
 ## 시작하기
 
@@ -182,37 +193,76 @@ curl http://localhost:8000/api/v1/references/{analysis_id}
 
 ```
 ai-video-marketing/
-├── frontend/                # Next.js 14
+├── frontend/                    # Next.js 14
 │   ├── app/
-│   │   ├── page.tsx        # 레퍼런스 분석 페이지
-│   │   └── brands/         # 브랜드 관리 페이지
+│   │   ├── page.tsx            # 대시보드
+│   │   ├── create/             # AI Content Factory
+│   │   │   ├── page.tsx        # 6단계 마법사
+│   │   │   └── edit/
+│   │   │       └── page.tsx    # Canvas 텍스트 에디터
+│   │   ├── references/         # 레퍼런스 라이브러리
+│   │   │   └── page.tsx
+│   │   ├── brands/             # 브랜드 관리
+│   │   │   └── page.tsx
+│   │   └── studio/             # Video Studio (레거시)
+│   │       └── page.tsx
+│   ├── components/
+│   │   └── canvas/             # Canvas 에디터 컴포넌트
+│   │       ├── CanvasTextEditor.tsx
+│   │       ├── FabricCanvas.tsx
+│   │       ├── TextToolbar.tsx
+│   │       ├── LayerPanel.tsx
+│   │       ├── CanvasExportPanel.tsx
+│   │       ├── PlatformPresets.tsx
+│   │       └── BatchExportModal.tsx
+│   ├── __tests__/              # 테스트 파일
+│   │   └── canvas/
 │   └── lib/
-│       └── api.ts          # API 클라이언트
-├── backend/                 # FastAPI
+│       └── api.ts              # API 클라이언트
+├── backend/                     # FastAPI
 │   ├── app/
-│   │   ├── api/v1/         # API 엔드포인트
-│   │   │   ├── brands.py   # 브랜드/제품 API
-│   │   │   ├── references.py # 영상 분석 API
-│   │   │   └── health.py   # 헬스체크
-│   │   ├── core/           # 설정
-│   │   │   ├── config.py   # 환경설정
-│   │   │   └── database.py # DB 연결
-│   │   ├── models/         # SQLAlchemy 모델
+│   │   ├── api/v1/             # API 엔드포인트
+│   │   │   ├── brands.py       # 브랜드/제품 API
+│   │   │   ├── references.py   # 레퍼런스 분석 API
+│   │   │   ├── studio.py       # Video Studio API
+│   │   │   └── health.py       # 헬스체크
+│   │   ├── core/               # 설정
+│   │   │   ├── config.py       # 환경설정
+│   │   │   └── database.py     # DB 연결
+│   │   ├── models/             # SQLAlchemy 모델
 │   │   │   ├── brand.py
-│   │   │   └── product.py
-│   │   ├── schemas/        # Pydantic 스키마
-│   │   │   └── brand.py
-│   │   └── services/       # 비즈니스 로직
+│   │   │   ├── product.py
+│   │   │   └── reference_analysis.py
+│   │   ├── schemas/            # Pydantic 스키마
+│   │   │   ├── brand.py
+│   │   │   └── studio.py
+│   │   └── services/           # 비즈니스 로직
 │   │       ├── brand_service.py
 │   │       ├── product_service.py
-│   │       ├── reference_analyzer/
-│   │       ├── brand_knowledge/  # (예정)
-│   │       └── video_generator/  # (예정)
-│   └── alembic/            # DB 마이그레이션
+│   │       ├── sns_parser.py           # SNS 링크 파싱
+│   │       ├── sns_media_downloader.py # SNS 미디어 다운로드
+│   │       ├── image_analyzer.py       # 이미지 분석
+│   │       ├── content_image_analyzer.py
+│   │       ├── image_prompt_builder.py # AI 프롬프트 생성
+│   │       ├── batch_image_generator.py
+│   │       ├── image_composite_generator.py
+│   │       ├── image_editor.py         # 이미지 편집
+│   │       ├── image_metadata.py       # 메타데이터
+│   │       ├── reference_analyzer/     # 영상 분석
+│   │       ├── video_generator/        # 영상 생성
+│   │       └── brand_knowledge/        # RAG (예정)
+│   └── alembic/                # DB 마이그레이션
 │       └── versions/
 ├── docker/
 │   └── docker-compose.yml
-└── docs/
+├── docs/                       # API 문서
+│   ├── api/
+│   └── architecture/
+└── .moai/
+    └── specs/                  # SPEC 문서
+        ├── SPEC-CONTENT-FACTORY-001/
+        ├── SPEC-001/
+        └── SPEC-002/
 ```
 
 ## 데이터베이스 마이그레이션
