@@ -12,18 +12,30 @@ const nextConfig = {
         protocol: "https",
         hostname: "picsum.photos",
       },
+      {
+        protocol: "https",
+        hostname: "img.youtube.com",
+      },
+      {
+        protocol: "https",
+        hostname: "i.ytimg.com",
+      },
     ],
   },
   // Increase timeout for API routes (needed for long AI operations)
   serverExternalPackages: [],
   experimental: {
-    proxyTimeout: 120000, // 2 minutes
+    proxyTimeout: 300000, // 5 minutes for image generation
   },
   async rewrites() {
     return [
       {
         source: "/api/:path*",
         destination: "http://localhost:8000/api/:path*",
+      },
+      {
+        source: "/static/:path*",
+        destination: "http://localhost:8000/static/:path*",
       },
     ];
   },

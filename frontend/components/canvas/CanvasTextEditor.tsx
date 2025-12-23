@@ -398,7 +398,7 @@ export default function CanvasTextEditor({
             </button>
 
             {showSizePresets && (
-              <div className="absolute top-full left-0 mt-2 w-56 py-2 rounded-xl bg-card border border-default shadow-lg z-50 animate-fade-in">
+              <div className="absolute top-full left-0 mt-2 w-56 py-2 rounded-xl bg-card border border-default shadow-lg z-[100] animate-fade-in">
                 {CANVAS_SIZE_PRESETS.map((preset) => (
                   <button
                     key={preset.name}
@@ -442,7 +442,7 @@ export default function CanvasTextEditor({
       </div>
 
       {/* Text Toolbar */}
-      <div className="border-b border-default bg-card/50">
+      <div className="border-b border-default bg-card/50 relative z-40 overflow-visible">
         <TextToolbar
           selectedLayer={selectedLayer}
           onUpdate={handleUpdateLayer}
@@ -450,18 +450,21 @@ export default function CanvasTextEditor({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Canvas Area */}
-        <div className="flex-1 flex items-center justify-center bg-muted/30 p-8 overflow-auto">
-          <div className="shadow-2xl rounded-lg overflow-hidden">
-            <FabricCanvas
-              ref={canvasRef}
-              width={canvasSize.width}
-              height={canvasSize.height}
-              backgroundColor={backgroundColor}
-              backgroundImage={backgroundImage}
-              callbacks={callbacks}
-            />
+        <div className="flex-1 flex items-center justify-center bg-muted/30 p-4 overflow-hidden">
+          <div className="relative w-full h-full flex items-center justify-center">
+            <div className="shadow-2xl rounded-lg overflow-hidden max-w-full max-h-full">
+              <FabricCanvas
+                ref={canvasRef}
+                width={canvasSize.width}
+                height={canvasSize.height}
+                backgroundColor={backgroundColor}
+                backgroundImage={backgroundImage}
+                callbacks={callbacks}
+                className="max-w-full max-h-full"
+              />
+            </div>
           </div>
         </div>
 

@@ -72,8 +72,15 @@ class ReferenceAnalysis(Base, TimestampMixin):
     )
 
     thumbnail_url: Mapped[Optional[str]] = mapped_column(
-        String(500),
+        Text,
         nullable=True,
+    )
+
+    # All images (base64 encoded) for carousel posts
+    images: Mapped[List[str]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list,
     )
 
     # Analysis results (JSON fields)

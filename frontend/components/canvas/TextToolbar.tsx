@@ -229,7 +229,7 @@ export default function TextToolbar({
         </button>
 
         {showFontDropdown && (
-          <div className="absolute top-full left-0 mt-2 w-56 max-h-64 overflow-y-auto rounded-xl bg-card border border-default shadow-lg z-50 animate-fade-in">
+          <div className="absolute top-full left-0 mt-2 w-56 max-h-64 overflow-y-auto rounded-xl bg-card border border-default shadow-lg z-[100] animate-fade-in">
             <div className="p-2">
               <div className="text-xs font-medium text-muted-foreground px-2 py-1 mb-1">
                 시스템 폰트
@@ -413,7 +413,7 @@ export default function TextToolbar({
         </button>
 
         {showColorPicker === "text" && (
-          <div className="absolute top-full left-0 mt-2 p-3 rounded-xl bg-card border border-default shadow-lg z-50 animate-fade-in">
+          <div className="absolute top-full left-0 mt-2 p-3 rounded-xl bg-card border border-default shadow-lg z-[100] animate-fade-in">
             <div className="text-xs font-medium text-muted-foreground mb-2">
               글자 색상
             </div>
@@ -468,7 +468,7 @@ export default function TextToolbar({
         </button>
 
         {showColorPicker === "background" && (
-          <div className="absolute top-full left-0 mt-2 p-3 rounded-xl bg-card border border-default shadow-lg z-50 animate-fade-in">
+          <div className="absolute top-full left-0 mt-2 p-3 rounded-xl bg-card border border-default shadow-lg z-[100] animate-fade-in">
             <div className="text-xs font-medium text-muted-foreground mb-2">
               배경 색상
             </div>
@@ -529,7 +529,7 @@ export default function TextToolbar({
         </button>
 
         {showShadowPanel && (
-          <div className="absolute top-full right-0 mt-2 p-4 w-64 rounded-xl bg-card border border-default shadow-lg z-50 animate-fade-in">
+          <div className="absolute top-full right-0 mt-2 p-4 w-64 rounded-xl bg-card border border-default shadow-lg z-[100] animate-fade-in">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium text-foreground">
                 텍스트 그림자

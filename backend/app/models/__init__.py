@@ -15,5 +15,18 @@ from app.models.video_project import VideoProject
 from app.models.scene_image import SceneImage
 from app.models.scene_video import SceneVideo
 from app.models.storyboard import Storyboard
+from app.models.image_project import ImageProject
+from app.models.generated_image import GeneratedImage
 
-__all__ = ["Base", "Brand", "Product", "ReferenceAnalysis", "VideoProject", "SceneImage", "SceneVideo", "Storyboard"]
+__all__ = [
+    "Base",
+    "Brand",
+    "Product",
+    "ReferenceAnalysis",
+    "VideoProject",
+    "SceneImage",
+    "SceneVideo",
+    "Storyboard",
+    "ImageProject",
+    "GeneratedImage",
+]

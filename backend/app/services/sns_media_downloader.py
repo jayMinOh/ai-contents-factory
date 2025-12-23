@@ -33,10 +33,18 @@ from urllib.parse import urlparse
 
 from PIL import Image
 
+import httpx
+
 try:
-    from gallery_dl import job
+    from gallery_dl import job, config as gallery_config
 except ImportError:
     job = None
+    gallery_config = None
+
+try:
+    import instaloader
+except ImportError:
+    instaloader = None
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +71,7 @@ class SNSMediaDownloader:
     INSTAGRAM_PATTERNS = [
         r"(?:https?://)?(?:www\.)?instagram\.com/p/([a-zA-Z0-9_-]+)",
         r"(?:https?://)?instagram\.com/p/([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?(?:www\.)?instagram\.com/reel/([a-zA-Z0-9_-]+)",
     ]
 
     FACEBOOK_PATTERNS = [
@@ -78,20 +87,46 @@ class SNSMediaDownloader:
     ]
 
     # Supported image formats
-    SUPPORTED_FORMATS = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'}
+    SUPPORTED_IMAGE_FORMATS = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'}
+    SUPPORTED_FORMATS = SUPPORTED_IMAGE_FORMATS  # Alias for backward compatibility
 
-    def __init__(self, max_concurrent_downloads: int = 3):
+    # Supported video formats
+    SUPPORTED_VIDEO_FORMATS = {'.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v'}
+
+    # Default cookies file paths to check
+    DEFAULT_COOKIES_PATHS = [
+        'config/instagram_cookies.txt',
+        'config/cookies.txt',
+        'instagram_cookies.txt',
+        'cookies.txt',
+    ]
+
+    def __init__(self, max_concurrent_downloads: int = 3, cookies_file: Optional[str] = None):
         """
         Initialize SNS Media Downloader.
 
         Args:
             max_concurrent_downloads: Maximum concurrent downloads allowed
+            cookies_file: Optional path to cookies file for authentication
         """
         self.supported_platforms = self.SUPPORTED_PLATFORMS
         self.max_concurrent_downloads = max_concurrent_downloads
+        self.cookies_file = cookies_file or self._find_cookies_file()
 
         if job is None:
             logger.warning("gallery-dl not installed. Download functionality limited.")
+
+        if self.cookies_file:
+            logger.info(f"Using cookies file: {self.cookies_file}")
+        else:
+            logger.warning("No cookies file found. Instagram may require login.")
+
+    def _find_cookies_file(self) -> Optional[str]:
+        """Find cookies file from default locations."""
+        for path in self.DEFAULT_COOKIES_PATHS:
+            if os.path.exists(path):
+                return path
+        return None
 
     def is_supported_platform(self, platform: Optional[str]) -> bool:
         """
@@ -310,7 +345,16 @@ class SNSMediaDownloader:
             Exception: If download fails
         """
         try:
-            download_job = job.DownloadJob(url, options=options)
+            # Configure gallery-dl using its config module
+            if gallery_config is not None:
+                gallery_config.clear()
+                gallery_config.set(("extractor",), "base-directory", options.get('output', '.'))
+                gallery_config.set(("extractor",), "retries", options.get('retries', 3))
+                if options.get('cookies'):
+                    gallery_config.set(("extractor",), "cookies", options.get('cookies'))
+
+            # Create and run download job without options parameter
+            download_job = job.DownloadJob(url)
             download_job.run()
         except Exception as error:
             logger.error(f"gallery-dl job failed: {error}")
@@ -318,7 +362,7 @@ class SNSMediaDownloader:
 
     def get_downloaded_images(self, directory: str) -> List[str]:
         """
-        Get list of downloaded image files from directory.
+        Get list of downloaded image files from directory (including subdirectories).
 
         Args:
             directory: Directory to scan for images
@@ -331,23 +375,67 @@ class SNSMediaDownloader:
 
         images = []
         try:
-            for filename in os.listdir(directory):
-                file_path = os.path.join(directory, filename)
+            # Use os.walk to recursively scan all subdirectories
+            for root, dirs, files in os.walk(directory):
+                for filename in files:
+                    file_path = os.path.join(root, filename)
 
-                # Skip directories
-                if os.path.isdir(file_path):
-                    continue
-
-                # Check if it's an image file
-                _, ext = os.path.splitext(filename)
-                if ext.lower() in self.SUPPORTED_FORMATS:
-                    images.append(file_path)
+                    # Check if it's an image file
+                    _, ext = os.path.splitext(filename)
+                    if ext.lower() in self.SUPPORTED_FORMATS:
+                        images.append(file_path)
 
             return sorted(images)
 
         except Exception as error:
             logger.warning(f"Error scanning directory {directory}: {error}")
             return []
+
+    def get_downloaded_videos(self, directory: str) -> List[str]:
+        """
+        Get list of downloaded video files from directory (including subdirectories).
+
+        Args:
+            directory: Directory to scan for videos
+
+        Returns:
+            List of video file paths
+        """
+        if not os.path.exists(directory):
+            return []
+
+        videos = []
+        try:
+            # Use os.walk to recursively scan all subdirectories
+            for root, dirs, files in os.walk(directory):
+                for filename in files:
+                    file_path = os.path.join(root, filename)
+
+                    # Check if it's a video file
+                    _, ext = os.path.splitext(filename)
+                    if ext.lower() in self.SUPPORTED_VIDEO_FORMATS:
+                        videos.append(file_path)
+
+            return sorted(videos)
+
+        except Exception as error:
+            logger.warning(f"Error scanning directory {directory}: {error}")
+            return []
+
+    def get_all_media(self, directory: str) -> Dict[str, List[str]]:
+        """
+        Get all downloaded media files from directory, categorized by type.
+
+        Args:
+            directory: Directory to scan for media
+
+        Returns:
+            Dictionary with 'images' and 'videos' lists
+        """
+        return {
+            'images': self.get_downloaded_images(directory),
+            'videos': self.get_downloaded_videos(directory),
+        }
 
     def is_valid_image(self, image_data: bytes) -> bool:
         """
@@ -368,6 +456,67 @@ class SNSMediaDownloader:
             return True
         except Exception:
             return False
+
+    async def _extract_instagram_images_instaloader(self, shortcode: str) -> List[bytes]:
+        """
+        Extract images from Instagram post using Instaloader.
+
+        Args:
+            shortcode: Instagram post shortcode (e.g., 'DST5aQCk93z')
+
+        Returns:
+            List of image byte data
+        """
+        if instaloader is None:
+            raise SNSMediaDownloadError("instaloader is not installed")
+
+        try:
+            L = instaloader.Instaloader(
+                download_pictures=False,
+                download_videos=False,
+                download_video_thumbnails=False,
+                download_geotags=False,
+                download_comments=False,
+                save_metadata=False,
+                compress_json=False,
+            )
+
+            # Get post info
+            post = await asyncio.to_thread(
+                instaloader.Post.from_shortcode,
+                L.context,
+                shortcode
+            )
+
+            # Collect image URLs
+            image_urls = []
+            if post.typename == 'GraphSidecar':
+                # Carousel post - multiple images
+                for node in post.get_sidecar_nodes():
+                    if not node.is_video:
+                        image_urls.append(node.display_url)
+            elif not post.is_video:
+                # Single image post
+                image_urls.append(post.url)
+
+            # Download images
+            images_data = []
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                for img_url in image_urls:
+                    try:
+                        response = await client.get(img_url)
+                        if response.status_code == 200:
+                            image_bytes = response.content
+                            if self.is_valid_image(image_bytes):
+                                images_data.append(image_bytes)
+                    except Exception as e:
+                        logger.warning(f"Failed to download image {img_url}: {e}")
+
+            return images_data
+
+        except Exception as error:
+            logger.error(f"Instaloader extraction failed: {error}")
+            raise SNSMediaDownloadError(f"Instagram extraction failed: {str(error)}")
 
     async def extract_images_from_post(
         self,
@@ -390,7 +539,22 @@ class SNSMediaDownloader:
             SNSMediaDownloadError: If extraction fails
         """
         try:
-            # Download media first
+            # Detect platform
+            platform = self._detect_platform(url)
+
+            # For Instagram, try Instaloader first (no login required for public posts)
+            if platform == 'instagram' and instaloader is not None:
+                shortcode = self._match_patterns(url, self.INSTAGRAM_PATTERNS)
+                if shortcode:
+                    try:
+                        logger.info(f"Using Instaloader for Instagram post: {shortcode}")
+                        images = await self._extract_instagram_images_instaloader(shortcode)
+                        if images:
+                            return images
+                    except Exception as e:
+                        logger.warning(f"Instaloader failed, falling back to gallery-dl: {e}")
+
+            # Fallback to gallery-dl for other platforms or if Instaloader fails
             result = await self.download(url, output_dir, cookies_file)
 
             if not result.get('success'):

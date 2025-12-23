@@ -1,28 +1,11 @@
 import type { Metadata } from "next";
-import { Sora, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggleDropdown } from "@/components/theme-toggle";
 import { Toaster } from "sonner";
 import Link from "next/link";
-import { Sparkles, Home, PlusCircle, Bookmark, Building2, Zap } from "lucide-react";
-
-// Display font - Sora (geometric, modern)
-const sora = Sora({
-  subsets: ["latin"],
-  variable: "--font-sora",
-  display: "swap",
-  weight: ["400", "500", "600", "700"],
-});
-
-// Body font - Noto Sans KR (excellent Korean support)
-const notoSansKr = Noto_Sans_KR({
-  subsets: ["latin"],
-  variable: "--font-noto-sans-kr",
-  display: "swap",
-  weight: ["400", "500", "600", "700"],
-});
+import { Sparkles, Home, PlusCircle, Bookmark, Building2, Zap, History } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "AI Content Factory",
@@ -32,6 +15,7 @@ export const metadata: Metadata = {
 const navItems = [
   { href: "/", label: "홈", icon: Home },
   { href: "/create", label: "콘텐츠 생성", icon: PlusCircle },
+  { href: "/history", label: "히스토리", icon: History },
   { href: "/references", label: "레퍼런스", icon: Bookmark },
   { href: "/brands", label: "브랜드 관리", icon: Building2 },
 ];
@@ -42,8 +26,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className={`${sora.variable} ${notoSansKr.variable}`} suppressHydrationWarning>
-      <body className={`${notoSansKr.className} antialiased`}>
+    <html lang="ko" suppressHydrationWarning>
+      <body className="antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -108,10 +92,6 @@ export default function RootLayout({
                     {/* Right Side */}
                     <div className="flex items-center gap-2">
                       <ThemeToggleDropdown />
-                      <Link href="/create" className="btn-primary flex items-center gap-2 text-sm py-2 px-4">
-                        <Sparkles className="w-4 h-4" />
-                        <span className="hidden sm:inline">새 콘텐츠</span>
-                      </Link>
                     </div>
                   </div>
                 </div>

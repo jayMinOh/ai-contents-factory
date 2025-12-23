@@ -70,8 +70,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        display: ["var(--font-sora)", "system-ui", "sans-serif"],
-        body: ["var(--font-noto-sans-kr)", "system-ui", "sans-serif"],
+        display: ["-apple-system", "BlinkMacSystemFont", "Apple SD Gothic Neo", "Pretendard", "Roboto", "Noto Sans KR", "Segoe UI", "Malgun Gothic", "sans-serif"],
+        body: ["-apple-system", "BlinkMacSystemFont", "Apple SD Gothic Neo", "Pretendard", "Roboto", "Noto Sans KR", "Segoe UI", "Malgun Gothic", "sans-serif"],
+        sans: ["-apple-system", "BlinkMacSystemFont", "Apple SD Gothic Neo", "Pretendard", "Roboto", "Noto Sans KR", "Segoe UI", "Malgun Gothic", "sans-serif"],
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",

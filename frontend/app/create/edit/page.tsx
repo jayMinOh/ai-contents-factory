@@ -7,18 +7,65 @@
  * Full-featured text overlay editor for SNS content creation
  */
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Save, Loader2 } from "lucide-react";
 import { CanvasTextEditor } from "@/components/canvas";
 
+interface SelectedImageData {
+  imageUrl: string;
+  imageIndex: number;
+}
+
+interface SelectedSectionImage {
+  slideNumber: number;
+  selectedIndex: number;
+  imageUrl: string;
+}
+
 function EditorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  // Background image state
+  const [backgroundImage, setBackgroundImage] = useState<string | undefined>(undefined);
+  const [isLoadingImage, setIsLoadingImage] = useState(true);
+
   // Get initial canvas size from query params
   const type = searchParams.get("type") || "single";
+  const storyboardId = searchParams.get("storyboardId");
+
+  // Load background image from sessionStorage
+  useEffect(() => {
+    try {
+      // Check for storyboard mode (multiple section images)
+      if (storyboardId) {
+        const sectionImagesData = sessionStorage.getItem("selectedSectionImages");
+        if (sectionImagesData) {
+          const sectionImages: SelectedSectionImage[] = JSON.parse(sectionImagesData);
+          // Use the first section image as background for now
+          // TODO: Support multiple slides in carousel mode
+          if (sectionImages.length > 0 && sectionImages[0].imageUrl) {
+            setBackgroundImage(sectionImages[0].imageUrl);
+          }
+        }
+      } else {
+        // Single image mode
+        const selectedImageData = sessionStorage.getItem("selectedImage");
+        if (selectedImageData) {
+          const imageData: SelectedImageData = JSON.parse(selectedImageData);
+          if (imageData.imageUrl) {
+            setBackgroundImage(imageData.imageUrl);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load background image from sessionStorage:", error);
+    } finally {
+      setIsLoadingImage(false);
+    }
+  }, [storyboardId]);
 
   // Determine canvas size based on content type
   const getCanvasSize = () => {
@@ -54,7 +101,7 @@ function EditorContent() {
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground px-2 py-1 rounded bg-muted">
             {type === "story"
-              ? "스토리 (9:16)"
+              ? "세로형 (9:16)"
               : type === "carousel"
               ? "캐러셀 (4:5)"
               : "정사각형 (1:1)"}
@@ -64,12 +111,19 @@ function EditorContent() {
 
       {/* Editor */}
       <main className="flex-1 overflow-hidden">
-        <CanvasTextEditor
-          initialWidth={width}
-          initialHeight={height}
-          backgroundColor="#1a1f2e"
-          className="h-full"
-        />
+        {isLoadingImage ? (
+          <div className="h-full flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-accent-500" />
+          </div>
+        ) : (
+          <CanvasTextEditor
+            initialWidth={width}
+            initialHeight={height}
+            backgroundColor="#1a1f2e"
+            backgroundImage={backgroundImage}
+            className="h-full"
+          />
+        )}
       </main>
     </div>
   );

@@ -43,8 +43,8 @@ const contentTypes = [
   {
     type: "story",
     icon: Smartphone,
-    label: "스토리",
-    desc: "9:16 세로형",
+    label: "세로형",
+    desc: "9:16",
     color: "glow",
     gradient: "from-glow-500 to-glow-600",
   },
@@ -150,9 +150,9 @@ export default function HomePage() {
             <h2 className="text-xl font-semibold text-foreground mb-1">빠른 생성</h2>
             <p className="text-sm text-muted">콘텐츠 유형을 선택하세요</p>
           </div>
-          <Link href="/create" className="text-sm text-accent-500 hover:text-accent-600 dark:text-accent-400 dark:hover:text-accent-300 flex items-center gap-1">
-            전체 보기 <ArrowRight className="w-4 h-4" />
-          </Link>
+          {/*<Link href="/create" className="text-sm text-accent-500 hover:text-accent-600 dark:text-accent-400 dark:hover:text-accent-300 flex items-center gap-1">*/}
+          {/*  전체 보기 <ArrowRight className="w-4 h-4" />*/}
+          {/*</Link>*/}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -234,7 +234,7 @@ export default function HomePage() {
                     }`}>
                       {work.type === "carousel" && "캐러셀"}
                       {work.type === "single" && "단일"}
-                      {work.type === "story" && "스토리"}
+                      {work.type === "story" && "세로형"}
                     </span>
                   </div>
                 </div>

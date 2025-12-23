@@ -3,7 +3,7 @@ import asyncio
 import json
 import re
 import tempfile
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from pathlib import Path
 import base64
 
@@ -100,6 +100,7 @@ class ReferenceAnalyzer:
 
             return {
                 "duration": metadata.get("duration"),
+                "reference_name": analysis.get("reference_name"),
                 "segments": analysis.get("segments", []),
                 "hook_points": analysis.get("hook_points", []),
                 "edge_points": analysis.get("edge_points", []),
@@ -320,18 +321,19 @@ class ReferenceAnalyzer:
 JSON 형식으로만 응답하세요:
 ```json
 {{
+  "reference_name": "분석 결과를 바탕으로 이 콘텐츠의 핵심 내용을 설명하는 한국어 문장 (30자 이내, 예: '발리 해변에서 서핑하는 여행 브이로그', '신제품 화장품 사용 후기 리뷰 영상')",
   "segments": [
-    {{"start_time": 0.0, "end_time": 3.0, "segment_type": "hook", "visual_description": "설명", "engagement_score": 0.9, "techniques": ["기법"]}},
-    {{"start_time": 3.0, "end_time": 8.0, "segment_type": "problem", "visual_description": "설명", "engagement_score": 0.7, "techniques": ["기법"]}}
+    {{"start_time": 0.0, "end_time": 3.0, "segment_type": "hook", "visual_description": "설명", "engagement_score": 0.9, "score_reasoning": "이 점수를 준 구체적 이유", "techniques": ["기법"]}},
+    {{"start_time": 3.0, "end_time": 8.0, "segment_type": "problem", "visual_description": "설명", "engagement_score": 0.7, "score_reasoning": "이 점수를 준 구체적 이유", "techniques": ["기법"]}}
   ],
   "hook_points": [
-    {{"timestamp": "0:00-0:03", "hook_type": "curiosity_gap", "effectiveness_score": 0.85, "description": "설명", "adaptable_template": "템플릿 문구"}}
+    {{"timestamp": "0:00-0:03", "hook_type": "curiosity_gap", "effectiveness_score": 0.85, "score_reasoning": "이 효과성 점수를 준 구체적 이유", "description": "설명", "adaptable_template": "템플릿 문구"}}
   ],
   "edge_points": [
-    {{"category": "visual", "description": "차별화 요소 설명", "impact_score": 0.8, "how_to_apply": "적용 방법"}}
+    {{"category": "visual", "description": "차별화 요소 설명", "impact_score": 0.8, "score_reasoning": "이 임팩트 점수를 준 구체적 이유", "how_to_apply": "적용 방법"}}
   ],
   "emotional_triggers": [
-    {{"timestamp": "0:05-0:10", "trigger_type": "FOMO", "intensity": 0.9, "description": "어떻게 감정을 자극하는지"}}
+    {{"timestamp": "0:05-0:10", "trigger_type": "FOMO", "intensity": 0.9, "score_reasoning": "이 강도 점수를 준 구체적 이유", "description": "어떻게 감정을 자극하는지"}}
   ],
   "pain_points": [
     {{"timestamp": "0:03-0:08", "pain_type": "explicit", "description": "페인포인트 내용", "empathy_technique": "공감 유도 기법"}}
@@ -342,14 +344,15 @@ JSON 형식으로만 응답하세요:
     {{"type": "editing_pattern", "content": "편집 패턴", "context": "적용 방법"}}
   ],
   "selling_points": [
-    {{"timestamp": "0:10-0:15", "claim": "주장", "evidence_type": "demonstration", "persuasion_technique": "social_proof", "effectiveness": 0.85}}
+    {{"timestamp": "0:10-0:15", "claim": "주장", "evidence_type": "demonstration", "persuasion_technique": "social_proof", "effectiveness": 0.85, "score_reasoning": "이 효과성 점수를 준 구체적 이유"}}
   ],
   "cta_analysis": {{
     "cta_type": "direct/soft/implied",
     "placement": "ending/throughout/multiple",
     "urgency_elements": ["한정 수량", "기간 한정"],
     "barrier_removal": ["무료 체험", "환불 보장"],
-    "effectiveness_score": 0.8
+    "effectiveness_score": 0.8,
+    "score_reasoning": "이 CTA 효과성 점수를 준 구체적 이유"
   }},
   "structure_pattern": {{
     "framework": "PAS",
@@ -469,6 +472,268 @@ JSON 형식으로만 응답하세요:
                     "action": "다시 분석을 시도해주세요",
                     "reason": "AI 응답 파싱 중 오류가 발생했습니다",
                     "example": "영상 URL을 다시 입력하거나 다른 영상을 시도해보세요"
+                }
+            ],
+        }
+
+    async def analyze_images(
+        self,
+        image_bytes_list: List[Any],
+        source_url: str = "",
+    ) -> Dict[str, Any]:
+        """
+        이미지 게시물 분석 (Instagram, Facebook 등)
+        - 마케팅 관점 분석
+        - 셀링포인트, 후킹요소 등 추출
+
+        Args:
+            image_bytes_list: List of bytes, BytesIO, or base64 strings
+            source_url: Original URL for context
+        """
+        import io
+
+        try:
+            # 이미지 로드
+            images = []
+            for img_data in image_bytes_list:
+                try:
+                    if isinstance(img_data, str):
+                        # base64 string
+                        img = Image.open(io.BytesIO(base64.b64decode(img_data)))
+                    elif isinstance(img_data, io.BytesIO):
+                        # BytesIO object
+                        img_data.seek(0)
+                        img = Image.open(img_data)
+                    elif isinstance(img_data, bytes):
+                        # raw bytes
+                        img = Image.open(io.BytesIO(img_data))
+                    else:
+                        # Assume it's already a PIL Image
+                        img = img_data
+                    images.append(img)
+                except Exception as e:
+                    print(f"이미지 로드 실패: {e}")
+                    continue
+
+            if not images:
+                raise Exception("분석할 이미지가 없습니다")
+
+            # Gemini 분석
+            max_retries = 3
+            last_error = None
+
+            for attempt in range(1, max_retries + 1):
+                try:
+                    analysis = await self._analyze_images_with_gemini(images, source_url)
+                    break
+                except Exception as e:
+                    last_error = e
+                    error_msg = str(e).lower()
+                    is_network_error = any(keyword in error_msg for keyword in [
+                        'timeout', 'timed out', 'connection', 'network',
+                        'reset', 'refused', 'unavailable', '503', '504',
+                        '502', '500', 'internal', 'server error', 'rate limit',
+                        'quota', 'overloaded', 'resource exhausted'
+                    ])
+
+                    if is_network_error and attempt < max_retries:
+                        wait_time = attempt * 5
+                        print(f"통신 오류 발생 (시도 {attempt}/{max_retries}): {e}")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        raise
+            else:
+                raise Exception(f"Gemini 분석 실패 (최대 {max_retries}회 재시도 후): {last_error}")
+
+            return {
+                "duration": None,
+                "reference_name": analysis.get("reference_name"),
+                "segments": analysis.get("segments", []),
+                "hook_points": analysis.get("hook_points", []),
+                "edge_points": analysis.get("edge_points", []),
+                "emotional_triggers": analysis.get("emotional_triggers", []),
+                "pain_points": analysis.get("pain_points", []),
+                "application_points": analysis.get("application_points", []),
+                "selling_points": analysis.get("selling_points", []),
+                "cta_analysis": analysis.get("cta_analysis", {}),
+                "structure_pattern": analysis.get("structure_pattern", {}),
+                "recommendations": analysis.get("recommendations", []),
+                "transcript": analysis.get("transcript"),
+            }
+
+        except Exception as e:
+            print(f"이미지 분석 실패: {e}")
+            raise
+
+    async def _analyze_images_with_gemini(
+        self,
+        images: List[Image.Image],
+        source_url: str = "",
+    ) -> Dict[str, Any]:
+        """Gemini로 이미지 분석"""
+
+        image_count = len(images)
+        is_carousel = image_count > 1
+
+        prompt = f"""당신은 10년 경력의 퍼포먼스 마케팅 전문가입니다. 이 SNS 이미지 게시물을 심층 분석해주세요.
+
+게시물 정보:
+- 이미지 수: {image_count}개 {'(캐러셀 게시물)' if is_carousel else '(단일 이미지)'}
+- 플랫폼: {'Instagram' if 'instagram' in source_url.lower() else 'Facebook' if 'facebook' in source_url.lower() else 'SNS'}
+
+다음 항목들을 마케팅 관점에서 분석해주세요:
+
+1. **이미지 세그먼트**: 각 이미지(슬라이드)의 역할과 마케팅 기능
+   - hook: 주목 끌기 (보통 첫 번째 이미지)
+   - problem: 문제/고충점 제기
+   - solution: 해결책 제시
+   - feature: 기능/특징 설명
+   - benefit: 혜택/가치 전달
+   - social_proof: 사회적 증거 (후기, 인증)
+   - cta: 행동 유도
+   - other: 기타
+
+   **engagement_score 평가 기준** (0.0~1.0):
+   - 시각적 임팩트 (30%): 색상, 구도, 타이포그래피
+   - 정보 전달력 (25%): 메시지 명확성, 가독성
+   - 감정적 호소 (25%): 공감, 욕망 자극
+   - 스크롤 스토핑력 (20%): 첫 인상의 강렬함
+
+2. **후킹 포인트**: 스크롤을 멈추게 하는 요소
+   - 기법: curiosity_gap(궁금증), pattern_interrupt(패턴 파괴), bold_claim(대담한 주장), visual_contrast(시각적 대비), question(질문형)
+   - 효과 점수와 재사용 가능한 템플릿
+
+3. **엣지 포인트**: 경쟁사와 차별화되는 독특한 요소
+   - 시각적 차별화 (색상, 구도, 스타일)
+   - 메시지 차별화 (카피, 톤앤매너)
+   - 브랜딩 차별화
+
+4. **감정 트리거**: 소비자 심리를 자극하는 요소
+   - FOMO, 신뢰, 희망/기대, 욕망, 자아실현 등
+
+5. **페인포인트 활용**: 소비자 고충점 활용 방식
+
+6. **활용 포인트**: 바로 적용할 수 있는 요소
+   - 복사 가능한 카피/문구
+   - 재현 가능한 디자인 요소
+   - 레이아웃 패턴
+
+7. **셀링 포인트**: 설득의 핵심 요소
+   - 주장(claim)과 근거
+   - 설득 기법: social_proof, scarcity, authority, before_after, comparison
+
+8. **CTA 분석**: 행동 유도 전략
+
+9. **구조 패턴**: 캐러셀 흐름 (예: 후킹→문제→해결→증거→CTA)
+
+10. **적용 권장사항**: 이 게시물의 성공 요소를 내 콘텐츠에 적용하는 방법 5개
+
+JSON 형식으로만 응답하세요:
+```json
+{{
+  "reference_name": "분석 결과를 바탕으로 이 콘텐츠의 핵심 내용을 설명하는 한국어 문장 (30자 이내, 예: '발리 해변에서 서핑하는 여행 브이로그', '신제품 화장품 사용 후기 리뷰 영상')",
+  "segments": [
+    {{"start_time": 0, "end_time": 1, "segment_type": "hook", "visual_description": "첫 번째 이미지 설명", "engagement_score": 0.9, "score_reasoning": "이 점수를 준 구체적 이유", "techniques": ["기법"]}},
+    {{"start_time": 1, "end_time": 2, "segment_type": "problem", "visual_description": "두 번째 이미지 설명", "engagement_score": 0.7, "score_reasoning": "이 점수를 준 구체적 이유", "techniques": ["기법"]}}
+  ],
+  "hook_points": [
+    {{"timestamp": "이미지 1", "hook_type": "curiosity_gap", "effectiveness_score": 0.85, "score_reasoning": "이 효과성 점수를 준 구체적 이유", "description": "설명", "elements": ["요소"], "adaptable_template": "템플릿 문구"}}
+  ],
+  "edge_points": [
+    {{"category": "visual", "description": "차별화 요소", "impact_score": 0.8, "score_reasoning": "이 임팩트 점수를 준 구체적 이유", "how_to_apply": "적용 방법"}}
+  ],
+  "emotional_triggers": [
+    {{"timestamp": "이미지 2", "trigger_type": "FOMO", "intensity": 0.9, "score_reasoning": "이 강도 점수를 준 구체적 이유", "description": "감정 자극 방식"}}
+  ],
+  "pain_points": [
+    {{"timestamp": "이미지 1-2", "pain_type": "explicit", "description": "페인포인트", "empathy_technique": "공감 기법"}}
+  ],
+  "application_points": [
+    {{"type": "copy_template", "content": "복사할 문구", "context": "사용 상황"}},
+    {{"type": "design_element", "content": "디자인 요소", "context": "적용 방법"}},
+    {{"type": "layout_pattern", "content": "레이아웃", "context": "적용 방법"}}
+  ],
+  "selling_points": [
+    {{"timestamp": "이미지 3", "claim": "주장", "evidence_type": "testimonial", "persuasion_technique": "social_proof", "effectiveness": 0.85, "score_reasoning": "이 효과성 점수를 준 구체적 이유"}}
+  ],
+  "cta_analysis": {{
+    "cta_type": "direct/soft/implied",
+    "placement": "last_slide/throughout",
+    "urgency_elements": [],
+    "barrier_removal": [],
+    "effectiveness_score": 0.8,
+    "score_reasoning": "이 CTA 효과성 점수를 준 구체적 이유"
+  }},
+  "structure_pattern": {{
+    "framework": "AIDA/PAS/Custom",
+    "flow": ["hook", "problem", "solution", "proof", "cta"],
+    "effectiveness_note": "구조가 효과적인 이유"
+  }},
+  "transcript": "이미지 내 텍스트 전체",
+  "recommendations": [
+    {{"priority": 1, "action": "구체적 행동", "reason": "이유", "example": "예시"}}
+  ]
+}}
+```"""
+
+        response = await asyncio.to_thread(
+            self.model.generate_content,
+            [prompt] + images
+        )
+
+        result_text = response.text
+
+        parsed = self._extract_and_parse_json(result_text)
+        if parsed:
+            return parsed
+
+        # 재시도
+        print("JSON 파싱 실패, 재시도 중...")
+        retry_prompt = f"이전 응답의 JSON 형식이 올바르지 않았습니다. 순수한 JSON만 출력해주세요.\n\n원본 요청:\n{prompt}"
+
+        retry_response = await asyncio.to_thread(
+            self.model.generate_content,
+            [retry_prompt] + images
+        )
+
+        parsed = self._extract_and_parse_json(retry_response.text)
+        if parsed:
+            return parsed
+
+        return self._get_fallback_image_analysis(image_count)
+
+    def _get_fallback_image_analysis(self, image_count: int) -> Dict[str, Any]:
+        """이미지 분석 폴백 결과"""
+        return {
+            "segments": [
+                {
+                    "start_time": i,
+                    "end_time": i + 1,
+                    "segment_type": "other",
+                    "visual_description": f"이미지 {i+1}",
+                    "engagement_score": 0.5,
+                    "techniques": ["분석 필요"],
+                } for i in range(image_count)
+            ],
+            "hook_points": [],
+            "edge_points": [],
+            "emotional_triggers": [],
+            "pain_points": [],
+            "application_points": [],
+            "selling_points": [],
+            "cta_analysis": {},
+            "structure_pattern": {
+                "framework": "unknown",
+                "flow": [],
+                "effectiveness_note": "분석 중 오류가 발생했습니다."
+            },
+            "recommendations": [
+                {
+                    "priority": 1,
+                    "action": "다시 분석을 시도해주세요",
+                    "reason": "AI 응답 파싱 중 오류가 발생했습니다",
+                    "example": "다시 시도해보세요"
                 }
             ],
         }

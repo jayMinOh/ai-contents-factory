@@ -1,7 +1,7 @@
 """
 SNS Parser Service
 
-Handles parsing of SNS URLs (Instagram, Facebook, Pinterest) and extracting
+Handles parsing of SNS URLs (Instagram, Facebook, Pinterest, YouTube) and extracting
 metadata and images from social media posts.
 
 This module integrates with SNSMediaDownloader to provide actual media
@@ -24,18 +24,21 @@ class SNSParseError(Exception):
 
 class SNSParser:
     """
-    Parser for Instagram, Facebook, and Pinterest URLs.
+    Parser for Instagram, Facebook, Pinterest, and YouTube URLs.
 
     Supports:
     - Instagram posts (www.instagram.com/p/{post_id}/)
     - Facebook posts (facebook.com/{username}/posts/{post_id})
     - Pinterest pins (pinterest.com/pin/{pin_id}/)
+    - YouTube videos (youtube.com/watch?v={video_id})
+    - YouTube Shorts (youtube.com/shorts/{video_id})
     """
 
     # Regular expressions for platform URL patterns
     INSTAGRAM_PATTERNS = [
         r"(?:https?://)?(?:www\.)?instagram\.com/p/([a-zA-Z0-9_-]+)",
         r"(?:https?://)?instagram\.com/p/([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?(?:www\.)?instagram\.com/reel/([a-zA-Z0-9_-]+)",
     ]
 
     FACEBOOK_PATTERNS = [
@@ -48,6 +51,13 @@ class SNSParser:
     PINTEREST_PATTERNS = [
         r"(?:https?://)?(?:www\.)?pinterest\.com/pin/(\d+)",
         r"(?:https?://)?pinterest\.com/pin/(\d+)",
+    ]
+
+    YOUTUBE_PATTERNS = [
+        r"(?:https?://)?(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?youtu\.be/([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?(?:www\.)?youtube\.com/embed/([a-zA-Z0-9_-]+)",
     ]
 
     async def parse_url(self, url: Optional[str]) -> Dict[str, Any]:
@@ -98,6 +108,15 @@ class SNSParser:
                 "url": url,
             }
 
+        # Check YouTube
+        youtube_match = self._match_patterns(url, self.YOUTUBE_PATTERNS)
+        if youtube_match:
+            return {
+                "platform": "youtube",
+                "video_id": youtube_match,
+                "url": url,
+            }
+
         raise SNSParseError(f"Unsupported or invalid SNS URL: {url}")
 
     def is_valid_url(self, url: str) -> bool:
@@ -121,6 +140,8 @@ class SNSParser:
         if self._match_patterns(url, self.FACEBOOK_PATTERNS):
             return True
         if self._match_patterns(url, self.PINTEREST_PATTERNS):
+            return True
+        if self._match_patterns(url, self.YOUTUBE_PATTERNS):
             return True
 
         return False

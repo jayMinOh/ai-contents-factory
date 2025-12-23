@@ -10,6 +10,7 @@ const api = axios.create({
 
 export interface AnalyzeRequest {
   url: string;
+  title?: string;
   extract_audio?: boolean;
 }
 
@@ -21,6 +22,7 @@ export interface TimelineSegment {
   audio_transcript?: string;
   text_overlay?: string;
   engagement_score: number;
+  score_reasoning?: string;
   techniques: string[];
 }
 
@@ -28,6 +30,7 @@ export interface HookPoint {
   timestamp: string;
   hook_type: string;
   effectiveness_score: number;
+  score_reasoning?: string;
   description?: string;
   elements?: string[];
   adaptable_template?: string;
@@ -37,6 +40,7 @@ export interface EdgePoint {
   category: string;
   description: string;
   impact_score: number;
+  score_reasoning?: string;
   how_to_apply: string;
 }
 
@@ -44,6 +48,7 @@ export interface EmotionalTrigger {
   timestamp: string;
   trigger_type: string;
   intensity: number;
+  score_reasoning?: string;
   description: string;
 }
 
@@ -66,6 +71,7 @@ export interface SellingPoint {
   evidence_type: string;
   persuasion_technique: string;
   effectiveness?: number;
+  score_reasoning?: string;
 }
 
 export interface CTAAnalysis {
@@ -74,6 +80,7 @@ export interface CTAAnalysis {
   urgency_elements: string[];
   barrier_removal: string[];
   effectiveness_score: number;
+  score_reasoning?: string;
 }
 
 export interface StructurePattern {
@@ -95,6 +102,8 @@ export interface AnalysisResult {
   title: string;
   status: string;
   duration?: number;
+  thumbnail_url?: string;
+  images?: string[];
   tags?: string[];
   notes?: string;
   error_message?: string;
@@ -112,8 +121,17 @@ export interface AnalysisResult {
 }
 
 export const referenceApi = {
-  analyze: async (data: AnalyzeRequest) => {
+  analyze: async (url: string, title?: string) => {
+    const data: AnalyzeRequest = { url };
+    if (title) {
+      data.title = title;
+    }
     const response = await api.post("/references/analyze", data);
+    return response.data;
+  },
+
+  updateAnalysis: async (analysisId: string, data: { title?: string }): Promise<AnalysisResult> => {
+    const response = await api.patch(`/references/${analysisId}`, data);
     return response.data;
   },
 
@@ -124,6 +142,28 @@ export const referenceApi = {
 
   listAnalyses: async (): Promise<AnalysisResult[]> => {
     const response = await api.get("/references/");
+    return response.data;
+  },
+
+  deleteAnalysis: async (analysisId: string): Promise<void> => {
+    await api.delete(`/references/${analysisId}`);
+  },
+
+  reanalyze: async (analysisId: string): Promise<{ analysis_id: string; status: string; message: string }> => {
+    const response = await api.post(`/references/${analysisId}/reanalyze`);
+    return response.data;
+  },
+
+  uploadImages: async (files: File[]): Promise<{ analysis_ids: string[] }> => {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+    const response = await api.post("/references/upload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
     return response.data;
   },
 };
@@ -521,6 +561,7 @@ export interface SNSParseResponse {
   platform: string;
   post_id: string | null;
   pin_id: string | null;
+  video_id: string | null;
   url: string;
   valid: boolean;
 }
@@ -903,6 +944,106 @@ export const studioApi = {
   },
 };
 
+// ========== Content Storyboard Types (for /create flow) ==========
+
+export interface StoryboardSlide {
+  slide_number: number;
+  section_type: "hook" | "problem" | "solution" | "benefit" | "social_proof" | "cta" | "intro" | "outro";
+  title: string;
+  description: string;
+  text_overlay?: string;
+  visual_direction?: string;
+  visual_prompt?: string;
+  visual_prompt_display?: string;
+  duration_seconds?: number;
+}
+
+export interface ContentStoryboard {
+  storyboard_id?: string;
+  storyline: string;
+  slides: StoryboardSlide[];
+  total_slides: number;
+  recommended_aspect_ratio?: string;
+  style_notes?: string;
+}
+
+export interface ContentStoryboardRequest {
+  content_type: "single" | "carousel" | "story";
+  purpose: "ad" | "info" | "lifestyle";
+  method: "reference" | "prompt";
+  prompt?: string;
+  brand_id?: string;
+  product_id?: string;
+  reference_id?: string;
+  selected_items?: {
+    hook_points?: HookPoint[];
+    edge_points?: EdgePoint[];
+    triggers?: EmotionalTrigger[];
+    selling_points?: SellingPoint[];
+    recommendations?: Recommendation[];
+  };
+}
+
+// ========== Concept Suggestion Types (for single/story) ==========
+
+export interface ConceptSuggestionRequest {
+  content_type: "single" | "story";
+  purpose: "ad" | "info" | "lifestyle";
+  generation_mode?: "reference" | "upload";
+  // For reference mode
+  reference_analysis_id?: string;
+  // For upload mode
+  reference_image_urls?: string[];
+  user_prompt?: string;
+  // Common fields
+  brand_id?: string;
+  product_id?: string;
+  selected_items?: {
+    hook_points?: HookPoint[];
+    edge_points?: EdgePoint[];
+    triggers?: EmotionalTrigger[];
+    selling_points?: SellingPoint[];
+    recommendations?: Recommendation[];
+  };
+}
+
+export interface ConceptSuggestion {
+  concept_id: string;
+  visual_concept: string;
+  copy_suggestion: string;
+  style_recommendation: string;
+  visual_prompt: string;
+  visual_prompt_display?: string;
+  text_overlay_suggestion?: string;
+  content_type: string;
+  purpose: string;
+  created_at?: string;
+}
+
+// ========== Storyboard API ==========
+
+export const storyboardApi = {
+  generate: async (data: ContentStoryboardRequest): Promise<ContentStoryboard> => {
+    const browserLang = typeof navigator !== 'undefined' ? navigator.language : 'ko';
+    const response = await api.post("/storyboard/generate", data, {
+      headers: {
+        "Accept-Language": browserLang,
+      },
+    });
+    return response.data;
+  },
+
+  generateConcept: async (data: ConceptSuggestionRequest): Promise<ConceptSuggestion> => {
+    const browserLang = typeof navigator !== 'undefined' ? navigator.language : 'ko';
+    const response = await api.post("/storyboard/generate-concept", data, {
+      headers: {
+        "Accept-Language": browserLang,
+      },
+    });
+    return response.data;
+  },
+};
+
 export const brandApi = {
   // Brand CRUD
   create: async (data: BrandCreate): Promise<Brand> => {
@@ -964,6 +1105,206 @@ export const brandApi = {
         headers: {
           "Content-Type": "multipart/form-data",
         },
+      }
+    );
+    return response.data;
+  },
+};
+
+// ========== Image Project Types ==========
+
+export interface GeneratedImage {
+  id: string;
+  image_project_id: string;
+  slide_number: number;
+  variant_index: number;
+  image_url: string;
+  prompt?: string;
+  is_selected: boolean;
+  generation_provider?: string;
+  generation_duration_ms?: number;
+  created_at?: string;
+}
+
+export interface ImageProject {
+  id: string;
+  title: string;
+  content_type: "single" | "carousel" | "story";
+  purpose: "ad" | "info" | "lifestyle";
+  method: "reference" | "prompt";
+  brand_id?: string;
+  product_id?: string;
+  reference_analysis_id?: string;
+  storyboard_data?: ContentStoryboard;
+  prompt?: string;
+  aspect_ratio: string;
+  status: string;
+  current_step: number;
+  error_message?: string;
+  completed_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  generated_images: GeneratedImage[];
+}
+
+export interface ImageProjectCreate {
+  title?: string;
+  content_type: "single" | "carousel" | "story";
+  purpose: "ad" | "info" | "lifestyle";
+  method: "reference" | "prompt";
+  brand_id?: string;
+  product_id?: string;
+  reference_analysis_id?: string;
+  storyboard_data?: ContentStoryboard;
+  prompt?: string;
+  aspect_ratio?: string;
+}
+
+export interface GenerateImagesRequest {
+  slide_number: number;
+  prompt: string;
+  num_variants?: number;
+  aspect_ratio?: string;
+}
+
+export interface GenerateImagesResponse {
+  project_id: string;
+  slide_number: number;
+  images: GeneratedImage[];
+  generation_time_ms: number;
+}
+
+export interface GenerateSingleSectionRequest {
+  slide_number: number;
+  use_reference?: boolean;
+}
+
+export interface GenerateSingleSectionResponse {
+  project_id: string;
+  slide_number: number;
+  images: GeneratedImage[];
+  generation_time_ms: number;
+  reference_used: boolean;
+}
+
+export interface SetReferenceRequest {
+  image_id: string;
+}
+
+export interface SetReferenceResponse {
+  project_id: string;
+  reference_image_id: string;
+  message: string;
+}
+
+export interface RegenerateSectionResponse {
+  project_id: string;
+  slide_number: number;
+  images: GeneratedImage[];
+  generation_time_ms: number;
+}
+
+// ========== Image Project API ==========
+
+export const imageProjectApi = {
+  create: async (data: ImageProjectCreate): Promise<ImageProject> => {
+    const response = await api.post("/image-projects/", data);
+    return response.data;
+  },
+
+  list: async (params?: {
+    content_type?: string;
+    status?: string;
+    brand_id?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ImageProject[]> => {
+    const response = await api.get("/image-projects/", { params });
+    return response.data;
+  },
+
+  get: async (projectId: string): Promise<ImageProject> => {
+    const response = await api.get(`/image-projects/${projectId}`);
+    return response.data;
+  },
+
+  update: async (projectId: string, data: Partial<ImageProject>): Promise<ImageProject> => {
+    const response = await api.patch(`/image-projects/${projectId}`, data);
+    return response.data;
+  },
+
+  delete: async (projectId: string): Promise<void> => {
+    await api.delete(`/image-projects/${projectId}`);
+  },
+
+  generateImages: async (
+    projectId: string,
+    data: GenerateImagesRequest
+  ): Promise<GenerateImagesResponse> => {
+    const response = await api.post(`/image-projects/${projectId}/generate`, data, {
+      timeout: 300000, // 5 minutes for image generation
+    });
+    return response.data;
+  },
+
+  selectImage: async (
+    projectId: string,
+    slideNumber: number,
+    variantIndex: number
+  ): Promise<ImageProject> => {
+    const response = await api.post(`/image-projects/${projectId}/select`, {
+      slide_number: slideNumber,
+      variant_index: variantIndex,
+    });
+    return response.data;
+  },
+
+  getImages: async (
+    projectId: string,
+    slideNumber?: number
+  ): Promise<GeneratedImage[]> => {
+    const params = slideNumber ? { slide_number: slideNumber } : {};
+    const response = await api.get(`/image-projects/${projectId}/images`, { params });
+    return response.data;
+  },
+
+  generateSection: async (
+    projectId: string,
+    slideNumber: number,
+    useReference?: boolean
+  ): Promise<GenerateSingleSectionResponse> => {
+    const response = await api.post(
+      `/image-projects/${projectId}/generate-section`,
+      {
+        slide_number: slideNumber,
+        use_reference: useReference ?? true,
+      },
+      {
+        timeout: 300000, // 5 minutes for image generation
+      }
+    );
+    return response.data;
+  },
+
+  setReferenceImage: async (
+    projectId: string,
+    imageId: string
+  ): Promise<SetReferenceResponse> => {
+    const response = await api.post(`/image-projects/${projectId}/set-reference`, {
+      image_id: imageId,
+    });
+    return response.data;
+  },
+
+  regenerateSection: async (
+    projectId: string,
+    slideNumber: number
+  ): Promise<RegenerateSectionResponse> => {
+    const response = await api.post(
+      `/image-projects/${projectId}/regenerate-section/${slideNumber}`,
+      {},
+      {
+        timeout: 300000, // 5 minutes for image generation
       }
     );
     return response.data;

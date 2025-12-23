@@ -302,19 +302,39 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       const updateScale = () => {
         if (!containerRef.current) return;
 
-        const containerWidth = containerRef.current.clientWidth;
-        const containerHeight = containerRef.current.clientHeight;
+        // Get parent container dimensions
+        const parent = containerRef.current.parentElement;
+        if (!parent) return;
+
+        const containerWidth = parent.clientWidth;
+        const containerHeight = parent.clientHeight;
+
+        // If container has no dimensions, use a reasonable default
+        if (containerWidth === 0 || containerHeight === 0) {
+          setScale(0.5); // Default scale for initial render
+          return;
+        }
 
         const scaleX = containerWidth / width;
         const scaleY = containerHeight / height;
-        const newScale = Math.min(scaleX, scaleY, 1);
+        const newScale = Math.min(scaleX, scaleY, 0.8); // Max 80% to leave some padding
 
         setScale(newScale);
       };
 
+      // Use ResizeObserver for more reliable dimension tracking
+      const resizeObserver = new ResizeObserver(updateScale);
+      if (containerRef.current?.parentElement) {
+        resizeObserver.observe(containerRef.current.parentElement);
+      }
+
       updateScale();
       window.addEventListener("resize", updateScale);
-      return () => window.removeEventListener("resize", updateScale);
+
+      return () => {
+        window.removeEventListener("resize", updateScale);
+        resizeObserver.disconnect();
+      };
     }, [width, height]);
 
     // Add text layer
