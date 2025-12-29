@@ -914,11 +914,19 @@ const FabricCanvas = forwardRef<FabricCanvasRef, FabricCanvasProps>(
       >
         <div
           style={{
-            transform: `scale(${scale})`,
-            transformOrigin: "center center",
+            width: width * scale,
+            height: height * scale,
+            overflow: "hidden",
           }}
         >
-          <canvas ref={canvasRef} />
+          <div
+            style={{
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+            }}
+          >
+            <canvas ref={canvasRef} />
+          </div>
         </div>
       </div>
     );

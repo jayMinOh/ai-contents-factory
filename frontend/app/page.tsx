@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -14,21 +14,16 @@ import {
   TrendingUp,
   Zap,
   Target,
+  Loader2,
 } from "lucide-react";
-
-// Mock data for recent works
-const recentWorks = [
-  { id: "1", type: "carousel", title: "제품 소개 캐러셀", createdAt: "2024-12-18", thumbnail: null },
-  { id: "2", type: "single", title: "프로모션 이미지", createdAt: "2024-12-17", thumbnail: null },
-  { id: "3", type: "story", title: "신제품 스토리", createdAt: "2024-12-16", thumbnail: null },
-];
+import { imageProjectApi, referenceApi, type ImageProject } from "@/lib/api";
 
 const contentTypes = [
   {
     type: "single",
     icon: ImageIcon,
     label: "단일 이미지",
-    desc: "1:1, 4:5 비율",
+    desc: "1:1, 4:5, 9:16 비율",
     color: "accent",
     gradient: "from-accent-500 to-accent-600",
   },
@@ -40,22 +35,51 @@ const contentTypes = [
     color: "electric",
     gradient: "from-electric-500 to-electric-600",
   },
-  {
-    type: "story",
-    icon: Smartphone,
-    label: "세로형",
-    desc: "9:16",
-    color: "glow",
-    gradient: "from-glow-500 to-glow-600",
-  },
 ];
 
 export default function HomePage() {
-  const [stats] = useState({
-    weeklyCount: 15,
-    totalCount: 128,
-    savedReferences: 24,
+  const [recentWorks, setRecentWorks] = useState<ImageProject[]>([]);
+  const [stats, setStats] = useState({
+    weeklyCount: 0,
+    totalCount: 0,
+    savedReferences: 0,
   });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+
+        // Fetch projects and references in parallel
+        const [projects, references] = await Promise.all([
+          imageProjectApi.list({ limit: 8 }),
+          referenceApi.listAnalyses(),
+        ]);
+
+        // Calculate weekly count (projects created in last 7 days)
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const weeklyCount = projects.filter((p) => {
+          const createdAt = new Date(p.created_at || "");
+          return createdAt >= oneWeekAgo;
+        }).length;
+
+        setRecentWorks(projects.slice(0, 4)); // Show only 4 recent works
+        setStats({
+          weeklyCount,
+          totalCount: projects.length,
+          savedReferences: references.length,
+        });
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -192,7 +216,12 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {recentWorks.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin text-accent-500 mx-auto mb-4" />
+            <p className="text-muted">데이터 로딩 중...</p>
+          </div>
+        ) : recentWorks.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
               <ImageIcon className="w-8 h-8 text-muted" />
@@ -205,36 +234,37 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {recentWorks.map((work, index) => (
-              <div
+              <Link
                 key={work.id}
+                href={`/history/${work.id}`}
                 className="group cursor-pointer"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 <div className="aspect-square rounded-xl overflow-hidden relative bg-muted border border-default mb-3">
-                  {work.thumbnail ? (
+                  {work.thumbnail_url ? (
                     <Image
-                      src={work.thumbnail}
+                      src={work.thumbnail_url}
                       alt={work.title}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center group-hover:bg-muted/80 transition-colors">
-                      {work.type === "carousel" && <Layers className="w-10 h-10 text-muted" />}
-                      {work.type === "single" && <ImageIcon className="w-10 h-10 text-muted" />}
-                      {work.type === "story" && <Smartphone className="w-10 h-10 text-muted" />}
+                      {work.content_type === "carousel" && <Layers className="w-10 h-10 text-muted" />}
+                      {work.content_type === "single" && <ImageIcon className="w-10 h-10 text-muted" />}
+                      {work.content_type === "story" && <Smartphone className="w-10 h-10 text-muted" />}
                     </div>
                   )}
 
                   {/* Type badge */}
                   <div className="absolute top-2 left-2">
                     <span className={`badge ${
-                      work.type === "carousel" ? "badge-purple" :
-                      work.type === "story" ? "badge-cyan" : "badge-accent"
+                      work.content_type === "carousel" ? "badge-purple" :
+                      work.content_type === "story" ? "badge-cyan" : "badge-accent"
                     }`}>
-                      {work.type === "carousel" && "캐러셀"}
-                      {work.type === "single" && "단일"}
-                      {work.type === "story" && "세로형"}
+                      {work.content_type === "carousel" && "캐러셀"}
+                      {work.content_type === "single" && "단일"}
+                      {work.content_type === "story" && "세로형"}
                     </span>
                   </div>
                 </div>
@@ -243,9 +273,9 @@ export default function HomePage() {
                 </p>
                 <p className="text-xs text-muted flex items-center gap-1">
                   <Clock className="w-3 h-3" />
-                  {work.createdAt}
+                  {work.created_at ? new Date(work.created_at).toLocaleDateString("ko-KR") : "-"}
                 </p>
-              </div>
+              </Link>
             ))}
           </div>
         )}

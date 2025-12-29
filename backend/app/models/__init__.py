@@ -17,6 +17,7 @@ from app.models.scene_video import SceneVideo
 from app.models.storyboard import Storyboard
 from app.models.image_project import ImageProject
 from app.models.generated_image import GeneratedImage
+from app.models.user import User, UserRole, UserStatus
 
 __all__ = [
     "Base",
@@ -29,4 +30,7 @@ __all__ = [
     "Storyboard",
     "ImageProject",
     "GeneratedImage",
+    "User",
+    "UserRole",
+    "UserStatus",
 ]

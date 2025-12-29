@@ -92,8 +92,8 @@ async def translate_korean_to_english_llm(text: str) -> str:
         # Configure Gemini
         genai.configure(api_key=settings.GOOGLE_API_KEY)
 
-        # Use gemini-2.0-flash-lite for fast, cheap translations
-        model = genai.GenerativeModel('gemini-2.0-flash-lite')
+        # Use gemini-3-flash-preview for fast, high-quality translations
+        model = genai.GenerativeModel('gemini-3-flash-preview')
 
         system_prompt = """You are a translator specializing in video production directions.
 Translate the Korean text to concise English optimized for video generation AI.

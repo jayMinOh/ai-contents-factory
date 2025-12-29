@@ -99,6 +99,7 @@ class CompositeImageGenerator:
             raise ValueError("GOOGLE_API_KEY is not configured")
 
         self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        # Use Gemini 3 Pro Image Preview - high-quality 4K image generation
         self.model_name = "gemini-3-pro-image-preview"
         logger.info("CompositeImageGenerator initialized successfully")
 

@@ -2,23 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeToggleDropdown } from "@/components/theme-toggle";
 import { Toaster } from "sonner";
-import Link from "next/link";
-import { Sparkles, Home, PlusCircle, Bookmark, Building2, Zap, History } from "lucide-react";
+import NavBar from "@/components/NavBar";
 
 export const metadata: Metadata = {
   title: "AI Content Factory",
   description: "AI를 활용한 SNS 콘텐츠 대량 생산 플랫폼",
 };
-
-const navItems = [
-  { href: "/", label: "홈", icon: Home },
-  { href: "/create", label: "콘텐츠 생성", icon: PlusCircle },
-  { href: "/history", label: "히스토리", icon: History },
-  { href: "/references", label: "레퍼런스", icon: Bookmark },
-  { href: "/brands", label: "브랜드 관리", icon: Building2 },
-];
 
 export default function RootLayout({
   children,
@@ -51,51 +41,7 @@ export default function RootLayout({
 
             <div className="relative min-h-screen flex flex-col">
               {/* Navigation */}
-              <nav className="glass sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="flex justify-between h-16">
-                    {/* Logo */}
-                    <div className="flex items-center">
-                      <Link
-                        href="/"
-                        className="flex items-center gap-3 group"
-                      >
-                        <div className="relative">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-500 to-electric-600 flex items-center justify-center shadow-glow-sm group-hover:shadow-glow-md transition-shadow duration-300">
-                            <Zap className="w-5 h-5 text-white" />
-                          </div>
-                          <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-glow-400 animate-pulse" />
-                        </div>
-                        <div>
-                          <span className="font-display font-bold text-lg tracking-tight">
-                            <span className="gradient-text">AI</span>
-                            <span className="text-foreground ml-1">Content Factory</span>
-                          </span>
-                        </div>
-                      </Link>
-                    </div>
-
-                    {/* Navigation Links */}
-                    <div className="flex items-center gap-1">
-                      {navItems.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className="nav-link flex items-center gap-2 text-sm"
-                        >
-                          <item.icon className="w-4 h-4" />
-                          <span className="hidden sm:inline">{item.label}</span>
-                        </Link>
-                      ))}
-                    </div>
-
-                    {/* Right Side */}
-                    <div className="flex items-center gap-2">
-                      <ThemeToggleDropdown />
-                    </div>
-                  </div>
-                </div>
-              </nav>
+              <NavBar />
 
               {/* Main Content */}
               <main className="flex-1 relative">

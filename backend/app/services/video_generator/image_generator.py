@@ -32,24 +32,56 @@ class PromptOptimizer:
             raise ValueError("GOOGLE_API_KEY is not configured")
         self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
+    def _is_well_formed_english_prompt(self, prompt: str) -> bool:
+        """Check if prompt is already a well-formed English image generation prompt."""
+        import re
+
+        # Check for Korean characters
+        korean_pattern = re.compile(r'[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]')
+        if korean_pattern.search(prompt):
+            return False
+
+        # Check for photography/image generation keywords
+        photo_keywords = [
+            'shot', 'photography', 'lighting', 'cinematic', 'aesthetic',
+            'resolution', 'photo', 'image', 'background', 'composition',
+            'portrait', 'product shot', 'commercial', 'studio', 'bokeh',
+            'depth of field', 'high quality', 'professional', 'mood'
+        ]
+        prompt_lower = prompt.lower()
+        keyword_count = sum(1 for kw in photo_keywords if kw in prompt_lower)
+
+        # If prompt is in English and has 2+ photography keywords, it's well-formed
+        return keyword_count >= 2
+
     async def optimize(self, prompt: str, context: Optional[str] = None) -> str:
         """
         Optimize a prompt for image generation.
         Translates to English and converts to visual-friendly description.
+        Skips optimization if prompt is already well-formed English.
         """
         import asyncio
+
+        # Skip optimization if prompt is already well-formed English
+        if self._is_well_formed_english_prompt(prompt):
+            logger.info(f"Prompt already well-formed, skipping optimization: '{prompt[:50]}...'")
+            return prompt
 
         system_instruction = """You are an expert at creating prompts for AI image generation for marketing videos.
 Your task is to convert the given description into an optimal English prompt for image generation.
 
 Rules:
 1. ALWAYS output in English only
-2. CRITICAL: Convert narrative/descriptive text into VISUAL elements:
+2. PRESERVE visual effects and techniques mentioned in the prompt:
+   - Keep effects like "heat map", "gradient overlay", "blur effect", "glow", "neon", "particle effects"
+   - Keep color effects like "red heat visualization", "blue mist", "golden highlights"
+   - Keep visual techniques like "double exposure", "split screen", "before/after"
+3. CRITICAL: Convert narrative/descriptive text into VISUAL elements:
    - Phrases like "문구가 등장", "텍스트 표시", "자막" describe overlays added in post-production, NOT rendered in the image
    - Abstract marketing concepts like "궁금증 유발", "기대감" should become facial expressions or body language
    - "시청자의 궁금증을 유발합니다" → describe the PERSON's intrigued expression, NOT text
-3. Focus on visual elements: lighting, composition, colors, mood, style, poses, expressions
-4. Convert abstract concepts to concrete visual representations:
+4. Focus on visual elements: lighting, composition, colors, mood, style, poses, expressions
+5. Convert abstract concepts to concrete visual representations:
    - "curiosity/궁금증" → "intrigued expression, raised eyebrows, leaning forward"
    - "anticipation/기대" → "excited smile, bright eyes, engaged posture"
    - "trust/신뢰" → "warm, confident smile, relaxed posture"
@@ -74,7 +106,7 @@ Example output: "Asian woman holding a Kerastase hair treatment bottle, nodding 
 
         def _generate():
             return self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-3-flash-preview",
                 contents=f"Convert this to an image generation prompt:\n\n{prompt}",
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
@@ -152,7 +184,7 @@ class GeminiImagenGenerator(ImageGeneratorBase):
 
         logger.info(f"GOOGLE_API_KEY configured (length: {len(settings.GOOGLE_API_KEY)})")
         self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
-        # Use Gemini 3 Pro Image Preview - advanced model with 4K support and better quality
+        # Use Gemini 3 Pro Image Preview - high-quality 4K image generation
         self.model_name = "gemini-3-pro-image-preview"
         logger.info(f"GeminiImagenGenerator initialized successfully with model: {self.model_name}")
 
@@ -161,11 +193,12 @@ class GeminiImagenGenerator(ImageGeneratorBase):
         prompt: str,
         aspect_ratio: str = "16:9",
         style: Optional[str] = None,
+        purpose: Optional[str] = None,
     ) -> dict:
         import asyncio
 
         start_time = time.time()
-        logger.info(f"Starting image generation - prompt: {prompt[:100]}..., aspect_ratio: {aspect_ratio}, style: {style}")
+        logger.info(f"Starting image generation - prompt: {prompt[:100]}..., aspect_ratio: {aspect_ratio}, style: {style}, purpose: {purpose}")
 
         # Validate aspect ratio
         if aspect_ratio not in self.SUPPORTED_ASPECT_RATIOS:
@@ -177,8 +210,13 @@ class GeminiImagenGenerator(ImageGeneratorBase):
         if style:
             enhanced_prompt = f"{style} style: {prompt}"
 
-        # Add quality indicators for professional image generation
-        enhanced_prompt = f"{enhanced_prompt}. High-quality, professional photography, studio-grade lighting."
+        # Add quality indicators based on purpose
+        if purpose == "ad":
+            # For advertising: use professional photography style
+            enhanced_prompt = f"{enhanced_prompt}. High-quality, professional photography, studio-grade lighting, commercial product shot."
+        else:
+            # For info/lifestyle: avoid photography terms to allow illustrations
+            enhanced_prompt = f"{enhanced_prompt}. High-quality, high resolution, detailed, masterpiece."
 
         def _generate():
             return self.client.models.generate_content(

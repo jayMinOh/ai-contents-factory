@@ -37,8 +37,58 @@ import { useQuery } from "@tanstack/react-query";
 import { brandApi, referenceApi, storyboardApi, imageProjectApi, AnalysisResult, HookPoint, EdgePoint, EmotionalTrigger, SellingPoint, Recommendation, ContentStoryboard, StoryboardSlide, ImageProject, GeneratedImage, GenerateSingleSectionResponse, ConceptSuggestion } from "@/lib/api";
 import { toast } from "sonner";
 
+// FadeInImage Component - Grok-style progressive loading effect
+interface FadeInImageProps {
+  src: string;
+  alt: string;
+  className?: string;
+  onError?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+  onClick?: () => void;
+}
+
+function FadeInImage({ src, alt, className = "", onError, onClick }: FadeInImageProps) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Reset state when src changes
+    setIsLoaded(false);
+    setIsLoading(true);
+  }, [src]);
+
+  return (
+    <div className="relative w-full h-full overflow-hidden" onClick={onClick}>
+      {/* Skeleton/placeholder while loading */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-gradient-to-br from-muted/50 to-muted/30 animate-pulse flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-accent-500/30 border-t-accent-500 rounded-full animate-spin" />
+        </div>
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className={`${className} transition-all duration-700 ease-out ${
+          isLoaded
+            ? "opacity-100 blur-0 scale-100"
+            : "opacity-0 blur-lg scale-105"
+        }`}
+        onLoad={() => {
+          setIsLoaded(true);
+          setIsLoading(false);
+        }}
+        onError={(e) => {
+          setIsLoading(false);
+          onError?.(e);
+        }}
+      />
+    </div>
+  );
+}
+
 // Content types
-type ContentType = "single" | "carousel" | "story";
+type ContentType = "single" | "carousel";
+type AspectRatio = "1:1" | "4:5" | "9:16";
 type Purpose = "ad" | "info" | "lifestyle";
 type GenerationMethod = "reference" | "prompt";
 type GenerationMode = "step_by_step" | "bulk";
@@ -54,6 +104,7 @@ interface SelectedAnalysisItems {
 
 interface ContentConfig {
   type: ContentType;
+  aspectRatio: AspectRatio;
   purpose: Purpose;
   brandId?: string;
   productId?: string;
@@ -61,18 +112,18 @@ interface ContentConfig {
   referenceId?: string;
   prompt?: string;
   selectedAnalysisItems?: SelectedAnalysisItems;
-  // Reference images for single/story types (multiple allowed)
+  // Reference images for single types (multiple allowed)
   uploadedReferenceImages?: Array<{ file: File; previewUrl: string; tempId?: string }>;
+  // Whether to use uploaded reference images for style guidance
+  useStyleReference?: boolean;
 }
 
-// Step data
+// Step data (steps 1-4 only, after step 4 goes to history)
 const steps = [
   { num: 1, label: "유형", icon: Layers },
   { num: 2, label: "용도", icon: Megaphone },
   { num: 3, label: "방식", icon: Edit3 },
   { num: 4, label: "생성", icon: Wand2 },
-  { num: 5, label: "선택", icon: Check },
-  { num: 6, label: "편집", icon: ImageIcon },
 ];
 
 const contentTypes = [
@@ -80,7 +131,7 @@ const contentTypes = [
     type: "single" as const,
     icon: ImageIcon,
     label: "단일 이미지",
-    desc: "1:1, 4:5 비율의 정사각형 또는 세로형 이미지",
+    desc: "1:1, 4:5, 9:16 비율 선택 가능",
     gradient: "from-accent-500 to-accent-600",
   },
   {
@@ -90,13 +141,12 @@ const contentTypes = [
     desc: "2~10장으로 구성된 슬라이드형 콘텐츠",
     gradient: "from-electric-500 to-electric-600",
   },
-  {
-    type: "story" as const,
-    icon: Smartphone,
-    label: "세로형",
-    desc: "9:16 세로형 풀스크린 콘텐츠",
-    gradient: "from-glow-500 to-glow-600",
-  },
+];
+
+const aspectRatios = [
+  { ratio: "1:1" as const, label: "1:1", desc: "정사각형" },
+  { ratio: "4:5" as const, label: "4:5", desc: "인스타 피드" },
+  { ratio: "9:16" as const, label: "9:16", desc: "릴스/스토리" },
 ];
 
 const purposes = [
@@ -128,12 +178,16 @@ function CreatePageContent() {
   const router = useRouter();
 
   const [step, setStep] = useState(1);
-  const initialType = (searchParams.get("type") as ContentType) || "single";
+  const typeParam = searchParams.get("type");
+  const initialType: ContentType = typeParam === "carousel" ? "carousel" : "single";
   const [config, setConfig] = useState<ContentConfig>({
     type: initialType,
+    aspectRatio: "1:1",
     purpose: "ad",
-    // Default method: carousel uses reference, single/story use prompt
+    // Default method: carousel uses reference, single use prompt
     method: initialType === "carousel" ? "reference" : "prompt",
+    // Style reference: default off for ad (product is fixed), on for lifestyle
+    useStyleReference: false,
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -156,8 +210,8 @@ function CreatePageContent() {
   const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [imageProjectId, setImageProjectId] = useState<string | null>(null);
 
-  // Generation mode state for step-by-step vs bulk
-  const [generationMode, setGenerationMode] = useState<GenerationMode>("step_by_step");
+  // Generation mode state for step-by-step vs bulk (default to bulk for background generation)
+  const [generationMode, setGenerationMode] = useState<GenerationMode>("bulk");
   const [currentSectionIndex, setCurrentSectionIndex] = useState<number>(0);
   const [referenceImageId, setReferenceImageId] = useState<string | null>(null);
   const [approvedSections, setApprovedSections] = useState<Set<number>>(new Set());
@@ -290,16 +344,103 @@ function CreatePageContent() {
   // Update type from URL params
   useEffect(() => {
     const typeParam = searchParams.get("type") as ContentType;
-    if (typeParam && ["single", "carousel", "story"].includes(typeParam)) {
+    if (typeParam && ["single", "carousel"].includes(typeParam)) {
       setConfig((prev) => ({ ...prev, type: typeParam }));
     }
   }, [searchParams]);
+
+  // Resume mode: restore project state from sessionStorage or API
+  useEffect(() => {
+    const resumeId = searchParams.get("resume");
+    if (!resumeId) return;
+
+    const restoreProject = async () => {
+      let project: ImageProject | null = null;
+
+      // Try sessionStorage first
+      const storedProject = sessionStorage.getItem("resumeProject");
+      if (storedProject) {
+        try {
+          project = JSON.parse(storedProject);
+          sessionStorage.removeItem("resumeProject");
+        } catch {
+          // Fall through to API fetch
+        }
+      }
+
+      // If not in sessionStorage, fetch from API
+      if (!project) {
+        try {
+          project = await imageProjectApi.get(resumeId);
+        } catch (error) {
+          console.error("Failed to fetch project:", error);
+          toast.error("Failed to restore project.");
+          router.push("/history");
+          return;
+        }
+      }
+
+      // Restore project config
+      // Map "story" type to "single" as they use similar flow
+      const mappedType: ContentType = project.content_type === "story" ? "single" : project.content_type;
+      setConfig((prev) => ({
+        ...prev,
+        type: mappedType,
+        purpose: project!.purpose,
+        method: project!.method,
+        brandId: project!.brand_id,
+        productId: project!.product_id,
+        referenceId: project!.reference_analysis_id,
+        aspectRatio: project!.aspect_ratio as AspectRatio,
+        prompt: project!.prompt,
+      }));
+
+      // Restore storyboard if exists
+      if (project.storyboard_data) {
+        setStoryboard(project.storyboard_data);
+      }
+
+      // Restore image project ID
+      setImageProjectId(project.id);
+
+      // Restore generated images grouped by slide
+      if (project.generated_images && project.generated_images.length > 0) {
+        const imagesBySlide: Record<number, string[]> = {};
+        project.generated_images.forEach((img) => {
+          const slideNum = img.slide_number;
+          if (!imagesBySlide[slideNum]) {
+            imagesBySlide[slideNum] = [];
+          }
+          imagesBySlide[slideNum].push(img.image_url);
+        });
+        setSectionImages(imagesBySlide);
+
+        // Set first image of each slide as selected
+        const selectedImages: Record<number, number> = {};
+        Object.keys(imagesBySlide).forEach((slideNum) => {
+          selectedImages[parseInt(slideNum)] = 0;
+        });
+        setSelectedSectionImages(selectedImages);
+      }
+
+      // Determine appropriate step based on project state
+      if (project.storyboard_data && project.storyboard_data.slides.length > 0) {
+        setStep(5);
+        toast.success("Project restored. You can continue working.");
+      } else {
+        setStep(4);
+        toast.info("Continue with storyboard generation.");
+      }
+    };
+
+    restoreProject();
+  }, [searchParams, router]);
 
   // Auto-generate concept when entering Step 4 with single/story (both reference and upload modes)
   useEffect(() => {
     if (
       step === 4 &&
-      (config.type === "single" || config.type === "story") &&
+      (config.type === "single") &&
       !conceptSuggestion &&
       !isGeneratingConcept
     ) {
@@ -372,7 +513,7 @@ function CreatePageContent() {
     try {
       // Build request data based on mode
       const requestData: {
-        content_type: "single" | "story";
+        content_type: "single";
         purpose: "ad" | "info" | "lifestyle";
         generation_mode: "reference" | "upload";
         reference_analysis_id?: string;
@@ -388,7 +529,7 @@ function CreatePageContent() {
           recommendations?: Recommendation[];
         };
       } = {
-        content_type: config.type as "single" | "story",
+        content_type: "single",
         purpose: config.purpose,
         generation_mode: isUploadMode ? "upload" : "reference",
         brand_id: config.brandId,
@@ -428,21 +569,170 @@ function CreatePageContent() {
     }
   };
 
-  // Confirm concept and proceed to image generation
+  // Helper function to convert File to base64
+  const fileToBase64 = (file: File): Promise<{ data: string; mime_type: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(",")[1]; // Remove data:image/xxx;base64, prefix
+        resolve({ data: base64, mime_type: file.type || "image/jpeg" });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Confirm concept and proceed to image generation (background mode)
   const handleConfirmConcept = async () => {
     if (!conceptSuggestion) return;
 
-    // Use the visual_prompt from concept suggestion for image generation
-    setConfig((prev) => ({
-      ...prev,
-      prompt: conceptSuggestion.visual_prompt,
-    }));
+    try {
+      toast.info("백그라운드에서 이미지를 생성합니다...");
 
-    // Proceed to step 5 for image generation
-    setStep(5);
+      // Build enhanced prompt with reference analysis data
+      // Include all selected analysis items for richer image generation
+      const buildEnhancedPrompt = (): string => {
+        const parts: string[] = [];
 
-    // Generate images using the concept's visual prompt
-    await handleGenerateImagesWithPrompt(conceptSuggestion.visual_prompt);
+        // Base visual prompt
+        parts.push(conceptSuggestion.visual_prompt);
+
+        // Add selected analysis items if available
+        if (config.selectedAnalysisItems) {
+          const { hookPoints, edgePoints, triggers, sellingPoints, recommendations } = config.selectedAnalysisItems;
+
+          // Add hook points - key attention grabbing elements
+          if (hookPoints && hookPoints.length > 0) {
+            const hookTexts = hookPoints
+              .filter(hp => hp.description || hp.adaptable_template)
+              .map(hp => hp.adaptable_template || hp.description)
+              .filter(Boolean);
+            if (hookTexts.length > 0) {
+              parts.push(`Hook elements: ${hookTexts.join(". ")}`);
+            }
+          }
+
+          // Add edge points - differentiating factors
+          if (edgePoints && edgePoints.length > 0) {
+            const edgeTexts = edgePoints
+              .filter(ep => ep.description || ep.how_to_apply)
+              .map(ep => ep.description)
+              .filter(Boolean);
+            if (edgeTexts.length > 0) {
+              parts.push(`Unique elements: ${edgeTexts.join(". ")}`);
+            }
+          }
+
+          // Add emotional triggers
+          if (triggers && triggers.length > 0) {
+            const triggerTexts = triggers
+              .filter(t => t.description)
+              .map(t => `${t.trigger_type}: ${t.description}`)
+              .filter(Boolean);
+            if (triggerTexts.length > 0) {
+              parts.push(`Emotional appeal: ${triggerTexts.join(". ")}`);
+            }
+          }
+
+          // Add selling points - key persuasive claims
+          if (sellingPoints && sellingPoints.length > 0) {
+            const spTexts = sellingPoints
+              .filter(sp => sp.claim)
+              .map(sp => sp.claim)
+              .filter(Boolean);
+            if (spTexts.length > 0) {
+              parts.push(`Key claims: ${spTexts.join(". ")}`);
+            }
+          }
+
+          // Add recommendations - suggested approaches
+          if (recommendations && recommendations.length > 0) {
+            const recTexts = recommendations
+              .filter(r => r.action || r.example)
+              .map(r => r.action)
+              .filter(Boolean);
+            if (recTexts.length > 0) {
+              parts.push(`Apply: ${recTexts.join(". ")}`);
+            }
+          }
+        }
+
+        // Add concept suggestions
+        if (conceptSuggestion.style_recommendation) {
+          parts.push(`Style: ${conceptSuggestion.style_recommendation}`);
+        }
+        if (conceptSuggestion.copy_suggestion) {
+          parts.push(`Copy: ${conceptSuggestion.copy_suggestion}`);
+        }
+        if (conceptSuggestion.text_overlay_suggestion) {
+          parts.push(`Text overlay: ${conceptSuggestion.text_overlay_suggestion}`);
+        }
+
+        return parts.join(". ");
+      };
+
+      // Use enhanced prompt for image generation
+      const englishPrompt = buildEnhancedPrompt();
+      console.log("Enhanced prompt for image generation:", englishPrompt);
+
+      // Korean display version for user to see (keep original for display)
+      const koreanPrompt = conceptSuggestion.visual_prompt_display || conceptSuggestion.visual_prompt;
+
+      // Create storyboard data with single slide for concept
+      const storyboardData: ContentStoryboard = {
+        storyline: conceptSuggestion.visual_concept || "AI Generated Concept",
+        total_slides: 1,
+        slides: [
+          {
+            slide_number: 1,
+            title: conceptSuggestion.visual_concept || "AI Concept",
+            section_type: "hook",
+            visual_prompt: englishPrompt, // English for image generation
+            visual_prompt_display: koreanPrompt, // Korean for display
+            visual_direction: conceptSuggestion.style_recommendation || "",
+            description: conceptSuggestion.copy_suggestion || "",
+            text_overlay: conceptSuggestion.text_overlay_suggestion || "",
+          },
+        ],
+      };
+
+      // Convert uploaded reference images to base64 for style guidance (only if toggle is on)
+      let referenceImagesBase64: Array<{ data: string; mime_type: string }> | undefined;
+      if (config.useStyleReference && config.uploadedReferenceImages && config.uploadedReferenceImages.length > 0) {
+        referenceImagesBase64 = await Promise.all(
+          config.uploadedReferenceImages.map(img => fileToBase64(img.file))
+        );
+        console.log(`Converting ${referenceImagesBase64.length} reference images to base64 for style reference`);
+      } else {
+        console.log("Style reference disabled - using prompt only for generation");
+      }
+
+      // Create image project with storyboard data and reference images
+      const project = await imageProjectApi.create({
+        content_type: config.type,
+        purpose: config.purpose,
+        method: config.method,
+        generation_mode: "bulk",
+        brand_id: config.brandId,
+        product_id: config.productId,
+        reference_analysis_id: config.referenceId,
+        storyboard_data: storyboardData,
+        prompt: englishPrompt, // Use English prompt for image generation
+        aspect_ratio: config.aspectRatio,
+        reference_images_base64: referenceImagesBase64, // Include reference images for style
+      });
+
+      // Start background image generation
+      await imageProjectApi.startBackgroundGeneration(project.id);
+
+      toast.success("이미지 생성이 시작되었습니다. 히스토리에서 진행 상황을 확인하세요.");
+
+      // Navigate to history page
+      router.push("/history");
+    } catch (error) {
+      console.error("Failed to start background generation:", error);
+      toast.error("이미지 생성 시작에 실패했습니다.");
+    }
   };
 
   // Regenerate concept suggestion
@@ -457,16 +747,17 @@ function CreatePageContent() {
     toast.info("AI가 이미지를 생성하고 있습니다...");
 
     try {
-      // Create image project
+      // Create image project (Single/Story mode - uses step_by_step for 2 variants)
       const project = await imageProjectApi.create({
         content_type: config.type,
         purpose: config.purpose,
         method: config.method,
+        generation_mode: "step_by_step",
         brand_id: config.brandId,
         product_id: config.productId,
         reference_analysis_id: config.referenceId,
         prompt: prompt,
-        aspect_ratio: config.type === "story" ? "9:16" : "1:1",
+        aspect_ratio: config.aspectRatio,
       });
       setImageProjectId(project.id);
 
@@ -475,7 +766,7 @@ function CreatePageContent() {
         slide_number: 1,
         prompt: prompt,
         num_variants: 2,
-        aspect_ratio: config.type === "story" ? "9:16" : "1:1",
+        aspect_ratio: config.aspectRatio,
       });
 
       // Extract image URLs
@@ -502,15 +793,40 @@ function CreatePageContent() {
     setCurrentSectionIndex(0);
     setReferenceImageId(null);
 
-    // Proceed to Step 5 for section image generation
-    setStep(5);
-
     // Start generating images based on mode
     if (storyboard && storyboard.slides.length > 0) {
       if (mode === "bulk") {
-        await generateSectionImages(storyboard.slides);
+        // BULK MODE: Start background generation and navigate to history
+        try {
+          toast.info("백그라운드에서 이미지를 생성합니다...");
+
+          // Create image project with storyboard data
+          const project = await imageProjectApi.create({
+            content_type: config.type,
+            purpose: config.purpose,
+            method: config.method,
+            generation_mode: "bulk",
+            brand_id: config.brandId,
+            product_id: config.productId,
+            reference_analysis_id: config.referenceId,
+            storyboard_data: storyboard || undefined,
+            aspect_ratio: config.aspectRatio,
+          });
+
+          // Start background image generation
+          await imageProjectApi.startBackgroundGeneration(project.id);
+
+          toast.success("이미지 생성이 시작되었습니다. 히스토리에서 진행 상황을 확인하세요.");
+
+          // Navigate to history page
+          router.push("/history");
+        } catch (error) {
+          console.error("Failed to start background generation:", error);
+          toast.error("이미지 생성 시작에 실패했습니다.");
+        }
       } else {
-        // Step-by-step mode: generate first section only
+        // Step-by-step mode: Proceed to Step 5 and generate first section only
+        setStep(5);
         await generateSingleSection(0);
       }
     }
@@ -521,16 +837,17 @@ function CreatePageContent() {
     setGenerationProgress({ current: 0, total: slides.length });
 
     try {
-      // Create image project first
+      // Create image project first (Bulk mode)
       const project = await imageProjectApi.create({
         content_type: config.type,
         purpose: config.purpose,
         method: config.method,
+        generation_mode: "bulk",
         brand_id: config.brandId,
         product_id: config.productId,
         reference_analysis_id: config.referenceId,
         storyboard_data: storyboard || undefined,
-        aspect_ratio: config.type === "story" ? "9:16" : "1:1",
+        aspect_ratio: config.aspectRatio,
       });
       setImageProjectId(project.id);
 
@@ -547,7 +864,7 @@ function CreatePageContent() {
           slide_number: slide.slide_number,
           prompt: prompt,
           num_variants: 2,
-          aspect_ratio: config.type === "story" ? "9:16" : "1:1",
+          aspect_ratio: config.aspectRatio,
         });
 
         // Extract image URLs
@@ -579,27 +896,32 @@ function CreatePageContent() {
     try {
       let projectId = imageProjectId;
 
-      // Create image project if not exists
+      // Create image project if not exists (Step-by-step mode)
       if (!projectId) {
         const project = await imageProjectApi.create({
           content_type: config.type,
           purpose: config.purpose,
           method: config.method,
+          generation_mode: "step_by_step",
           brand_id: config.brandId,
           product_id: config.productId,
           reference_analysis_id: config.referenceId,
           storyboard_data: storyboard || undefined,
-          aspect_ratio: config.type === "story" ? "9:16" : "1:1",
+          aspect_ratio: config.aspectRatio,
         });
         projectId = project.id;
         setImageProjectId(project.id);
       }
 
+      // Extract prompt from slide (priority: visual_prompt > visual_direction > description)
+      const slidePrompt = slide.visual_prompt || slide.visual_direction || slide.description || "";
+
       // Use generateSection API for step-by-step mode (supports reference image)
       const result: GenerateSingleSectionResponse = await imageProjectApi.generateSection(
         projectId,
         slide.slide_number,
-        referenceImageId !== null // use reference if we have one
+        referenceImageId !== null, // use reference if we have one
+        slidePrompt // explicitly pass the prompt
       );
 
       // Extract image URLs
@@ -642,7 +964,7 @@ function CreatePageContent() {
       try {
         // Get the image ID from the generated images
         const projectData = await imageProjectApi.get(imageProjectId);
-        const selectedImage = projectData.generated_images.find(
+        const selectedImage = projectData.generated_images?.find(
           (img) => img.slide_number === slideNumber && img.variant_index === selectedVariantIndex
         );
         if (selectedImage) {
@@ -679,7 +1001,7 @@ function CreatePageContent() {
     try {
       const result = await imageProjectApi.regenerateSection(imageProjectId, currentSlide.slide_number);
 
-      const imageUrls = result.images.map((img) => img.image_url);
+      const imageUrls = result.new_images.map((img) => img.image_url);
 
       setSectionImages((prev) => ({
         ...prev,
@@ -711,7 +1033,7 @@ function CreatePageContent() {
     try {
       const result = await imageProjectApi.regenerateSection(imageProjectId, slideNumber);
 
-      const imageUrls = result.images.map((img) => img.image_url);
+      const imageUrls = result.new_images.map((img) => img.image_url);
 
       setSectionImages((prev) => ({
         ...prev,
@@ -844,16 +1166,17 @@ function CreatePageContent() {
     toast.info("AI가 이미지를 생성하고 있습니다...");
 
     try {
-      // Create image project
+      // Create image project (Single/Story mode - uses step_by_step for 2 variants)
       const project = await imageProjectApi.create({
         content_type: config.type,
         purpose: config.purpose,
         method: config.method,
+        generation_mode: "step_by_step",
         brand_id: config.brandId,
         product_id: config.productId,
         reference_analysis_id: config.referenceId,
         prompt: config.prompt,
-        aspect_ratio: config.type === "story" ? "9:16" : "1:1",
+        aspect_ratio: config.aspectRatio,
       });
       setImageProjectId(project.id);
 
@@ -865,7 +1188,7 @@ function CreatePageContent() {
         slide_number: 1,
         prompt: prompt,
         num_variants: 2,
-        aspect_ratio: config.type === "story" ? "9:16" : "1:1",
+        aspect_ratio: config.aspectRatio,
       });
 
       // Extract image URLs
@@ -950,15 +1273,18 @@ function CreatePageContent() {
               <p className="text-muted">콘텐츠 유형을 선택하세요</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
               {contentTypes.map((item) => (
                 <button
                   key={item.type}
                   onClick={() => {
-                    // Set method based on content type: carousel uses reference, others use prompt
+                    // Set method based on content type: carousel uses reference, single uses prompt
                     const defaultMethod = item.type === "carousel" ? "reference" : "prompt";
                     setConfig((prev) => ({ ...prev, type: item.type, method: defaultMethod }));
-                    handleNext();
+                    // Carousel goes directly to next step
+                    if (item.type === "carousel") {
+                      handleNext();
+                    }
                   }}
                   className={`selection-card text-center ${
                     config.type === item.type ? "selected" : ""
@@ -974,6 +1300,43 @@ function CreatePageContent() {
                 </button>
               ))}
             </div>
+
+            {/* Aspect Ratio Selection for Single Image */}
+            {config.type === "single" && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <h3 className="font-semibold text-foreground mb-1">비율 선택</h3>
+                  <p className="text-sm text-muted">이미지 비율을 선택하세요</p>
+                </div>
+                <div className="flex justify-center gap-3">
+                  {aspectRatios.map((item) => (
+                    <button
+                      key={item.ratio}
+                      onClick={() => {
+                        setConfig((prev) => ({ ...prev, aspectRatio: item.ratio }));
+                      }}
+                      className={`px-6 py-3 rounded-xl border-2 transition-all ${
+                        config.aspectRatio === item.ratio
+                          ? "border-accent-500 bg-accent-50 dark:bg-accent-900/20"
+                          : "border-border hover:border-accent-300"
+                      }`}
+                    >
+                      <p className="font-bold text-foreground">{item.label}</p>
+                      <p className="text-xs text-muted">{item.desc}</p>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-center pt-4">
+                  <button
+                    onClick={handleNext}
+                    className="btn-primary flex items-center gap-2 px-8 py-3"
+                  >
+                    다음
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1850,7 +2213,7 @@ function CreatePageContent() {
         {step === 4 && (
           <div className="space-y-8">
             {/* Single Image or Story: Concept Suggestion (both upload and reference modes) */}
-            {(config.type === "single" || config.type === "story") && (
+            {(config.type === "single") && (
               <>
                 <div className="text-center">
                   <h2 className="font-display text-2xl font-bold text-foreground mb-2">
@@ -1901,7 +2264,7 @@ function CreatePageContent() {
                   </div>
                 )}
 
-                {/* Concept Suggestion Display */}
+                {/* Concept Suggestion Display - All fields editable */}
                 {conceptSuggestion && !isGeneratingConcept && (
                   <div className="space-y-6">
                     {/* Concept Cards */}
@@ -1909,55 +2272,266 @@ function CreatePageContent() {
                       <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-accent-500" />
                         AI 컨셉 제안
+                        <span className="text-xs text-muted font-normal ml-2">더블클릭하여 편집</span>
                       </h3>
 
                       <div className="space-y-4">
-                        {/* Visual Concept */}
-                        <div className="p-4 rounded-xl bg-muted/30">
+                        {/* Visual Concept - Editable */}
+                        <div
+                          className="p-4 rounded-xl bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors group"
+                          onDoubleClick={() => {
+                            setEditingSlideNumber(-2);
+                            setEditingPrompt(conceptSuggestion.visual_concept);
+                          }}
+                        >
                           <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                             <ImageIcon className="w-4 h-4 text-electric-500" />
                             비주얼 컨셉
+                            <Edit3 className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
                           </h4>
-                          <p className="text-sm text-foreground/80 leading-relaxed">
-                            {conceptSuggestion.visual_concept}
-                          </p>
+                          {editingSlideNumber === -2 ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingPrompt}
+                                onChange={(e) => setEditingPrompt(e.target.value)}
+                                className="w-full p-3 rounded-lg bg-background border border-default text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-accent-500"
+                                rows={3}
+                                autoFocus
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  onClick={() => setEditingSlideNumber(null)}
+                                  className="px-3 py-1.5 text-xs rounded-lg border border-default hover:bg-muted transition-colors"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setConceptSuggestion({ ...conceptSuggestion, visual_concept: editingPrompt });
+                                    setEditingSlideNumber(null);
+                                  }}
+                                  className="px-3 py-1.5 text-xs rounded-lg bg-accent-500 text-white hover:bg-accent-600 transition-colors"
+                                >
+                                  저장
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-foreground/80 leading-relaxed">{conceptSuggestion.visual_concept}</p>
+                          )}
                         </div>
 
-                        {/* Copy Suggestion */}
-                        <div className="p-4 rounded-xl bg-muted/30">
+                        {/* Visual Prompt - Editable (Display Korean, Generate with English) */}
+                        <div
+                          className="p-4 rounded-xl bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors group"
+                          onDoubleClick={() => {
+                            setEditingSlideNumber(-1);
+                            setEditingPrompt(conceptSuggestion.visual_prompt_display || conceptSuggestion.visual_prompt);
+                          }}
+                        >
+                          <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                            <Wand2 className="w-4 h-4 text-accent-500" />
+                            비주얼 프롬프트
+                            <Edit3 className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </h4>
+                          {editingSlideNumber === -1 ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingPrompt}
+                                onChange={(e) => setEditingPrompt(e.target.value)}
+                                className="w-full p-3 rounded-lg bg-background border border-default text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-accent-500"
+                                rows={4}
+                                autoFocus
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  onClick={() => setEditingSlideNumber(null)}
+                                  className="px-3 py-1.5 text-xs rounded-lg border border-default hover:bg-muted transition-colors"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setConceptSuggestion({ ...conceptSuggestion, visual_prompt_display: editingPrompt });
+                                    setEditingSlideNumber(null);
+                                  }}
+                                  className="px-3 py-1.5 text-xs rounded-lg bg-accent-500 text-white hover:bg-accent-600 transition-colors"
+                                >
+                                  저장
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-foreground/80 leading-relaxed">{conceptSuggestion.visual_prompt_display || conceptSuggestion.visual_prompt}</p>
+                          )}
+                        </div>
+
+                        {/* Copy Suggestion - Editable */}
+                        <div
+                          className="p-4 rounded-xl bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors group"
+                          onDoubleClick={() => {
+                            setEditingSlideNumber(-3);
+                            setEditingPrompt(conceptSuggestion.copy_suggestion);
+                          }}
+                        >
                           <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                             <Edit3 className="w-4 h-4 text-glow-500" />
                             카피 제안
+                            <Edit3 className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
                           </h4>
-                          <p className="text-sm text-foreground/80 leading-relaxed">
-                            {conceptSuggestion.copy_suggestion}
-                          </p>
+                          {editingSlideNumber === -3 ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingPrompt}
+                                onChange={(e) => setEditingPrompt(e.target.value)}
+                                className="w-full p-3 rounded-lg bg-background border border-default text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-accent-500"
+                                rows={3}
+                                autoFocus
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  onClick={() => setEditingSlideNumber(null)}
+                                  className="px-3 py-1.5 text-xs rounded-lg border border-default hover:bg-muted transition-colors"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setConceptSuggestion({ ...conceptSuggestion, copy_suggestion: editingPrompt });
+                                    setEditingSlideNumber(null);
+                                  }}
+                                  className="px-3 py-1.5 text-xs rounded-lg bg-accent-500 text-white hover:bg-accent-600 transition-colors"
+                                >
+                                  저장
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-foreground/80 leading-relaxed">{conceptSuggestion.copy_suggestion}</p>
+                          )}
                         </div>
 
-                        {/* Style Recommendation */}
-                        <div className="p-4 rounded-xl bg-muted/30">
+                        {/* Style Recommendation - Editable */}
+                        <div
+                          className="p-4 rounded-xl bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors group"
+                          onDoubleClick={() => {
+                            setEditingSlideNumber(-4);
+                            setEditingPrompt(conceptSuggestion.style_recommendation);
+                          }}
+                        >
                           <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                             <Sparkles className="w-4 h-4 text-accent-500" />
                             스타일 제안
+                            <Edit3 className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
                           </h4>
-                          <p className="text-sm text-foreground/80 leading-relaxed">
-                            {conceptSuggestion.style_recommendation}
-                          </p>
+                          {editingSlideNumber === -4 ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingPrompt}
+                                onChange={(e) => setEditingPrompt(e.target.value)}
+                                className="w-full p-3 rounded-lg bg-background border border-default text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-accent-500"
+                                rows={3}
+                                autoFocus
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  onClick={() => setEditingSlideNumber(null)}
+                                  className="px-3 py-1.5 text-xs rounded-lg border border-default hover:bg-muted transition-colors"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setConceptSuggestion({ ...conceptSuggestion, style_recommendation: editingPrompt });
+                                    setEditingSlideNumber(null);
+                                  }}
+                                  className="px-3 py-1.5 text-xs rounded-lg bg-accent-500 text-white hover:bg-accent-600 transition-colors"
+                                >
+                                  저장
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-foreground/80 leading-relaxed">{conceptSuggestion.style_recommendation}</p>
+                          )}
                         </div>
 
-                        {/* Text Overlay Suggestion (if available) */}
-                        {conceptSuggestion.text_overlay_suggestion && (
-                          <div className="p-4 rounded-xl bg-muted/30">
-                            <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                              <Megaphone className="w-4 h-4 text-yellow-500" />
-                              텍스트 오버레이 제안
-                            </h4>
+                        {/* Text Overlay Suggestion - Editable */}
+                        <div
+                          className="p-4 rounded-xl bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors group"
+                          onDoubleClick={() => {
+                            setEditingSlideNumber(-5);
+                            setEditingPrompt(conceptSuggestion.text_overlay_suggestion || "");
+                          }}
+                        >
+                          <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                            <Megaphone className="w-4 h-4 text-yellow-500" />
+                            텍스트 오버레이 제안
+                            <Edit3 className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </h4>
+                          {editingSlideNumber === -5 ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingPrompt}
+                                onChange={(e) => setEditingPrompt(e.target.value)}
+                                className="w-full p-3 rounded-lg bg-background border border-default text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-accent-500"
+                                rows={2}
+                                autoFocus
+                                placeholder="텍스트 오버레이 문구 입력"
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  onClick={() => setEditingSlideNumber(null)}
+                                  className="px-3 py-1.5 text-xs rounded-lg border border-default hover:bg-muted transition-colors"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setConceptSuggestion({ ...conceptSuggestion, text_overlay_suggestion: editingPrompt });
+                                    setEditingSlideNumber(null);
+                                  }}
+                                  className="px-3 py-1.5 text-xs rounded-lg bg-accent-500 text-white hover:bg-accent-600 transition-colors"
+                                >
+                                  저장
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
                             <p className="text-sm text-foreground/80 leading-relaxed font-medium">
-                              &ldquo;{conceptSuggestion.text_overlay_suggestion}&rdquo;
+                              {conceptSuggestion.text_overlay_suggestion ? `"${conceptSuggestion.text_overlay_suggestion}"` : "(없음)"}
                             </p>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
+
+                      {/* Style Reference Toggle - only show if upload mode with images */}
+                      {config.method === "prompt" && config.uploadedReferenceImages && config.uploadedReferenceImages.length > 0 && (
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 dark:bg-muted/10 border border-default mt-4">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-foreground">스타일 참조</span>
+                            <span className="text-xs text-muted">
+                              {config.useStyleReference
+                                ? "업로드한 이미지의 스타일을 참고하여 생성"
+                                : "프롬프트만으로 자유롭게 생성"}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setConfig(prev => ({ ...prev, useStyleReference: !prev.useStyleReference }))}
+                            className={`relative w-12 h-6 rounded-full transition-colors ${
+                              config.useStyleReference
+                                ? "bg-accent-500"
+                                : "bg-muted"
+                            }`}
+                          >
+                            <span
+                              className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                                config.useStyleReference ? "left-7" : "left-1"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      )}
 
                       {/* Action Buttons */}
                       <div className="flex gap-4 mt-6">
@@ -1971,85 +2545,15 @@ function CreatePageContent() {
                         </button>
                         <button
                           onClick={handleConfirmConcept}
-                          disabled={isGenerating}
                           className="btn-primary flex-1 flex items-center justify-center gap-2"
                         >
-                          {isGenerating ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              이미지 생성 중...
-                            </>
-                          ) : (
-                            <>
-                              <Check className="w-4 h-4" />
-                              컨셉 확정
-                            </>
-                          )}
+                          <Check className="w-4 h-4" />
+                          컨셉 확정
                         </button>
                       </div>
                     </div>
                   </div>
                 )}
-              </>
-            )}
-
-            {/* Single Image or Story with Prompt Method: Direct image generation */}
-            {(config.type === "single" || config.type === "story") && config.method === "prompt" && (
-              <>
-                <div className="text-center">
-                  <h2 className="font-display text-2xl font-bold text-foreground mb-2">
-                    이미지 생성
-                  </h2>
-                  <p className="text-muted">AI가 4개의 변형 이미지를 생성합니다</p>
-                </div>
-
-                {/* Summary */}
-                <div className="p-6 rounded-2xl bg-muted/30 dark:bg-muted/10 border border-default space-y-3">
-                  <div className="flex justify-between py-2 border-b border-default">
-                    <span className="text-muted">콘텐츠 유형</span>
-                    <span className="font-medium text-foreground">
-                      {config.type === "single" ? "단일 이미지" : "세로형"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-default">
-                    <span className="text-muted">용도</span>
-                    <span className="font-medium text-foreground">
-                      {config.purpose === "ad" && "광고/홍보"}
-                      {config.purpose === "info" && "정보성"}
-                      {config.purpose === "lifestyle" && "일상/감성"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-default">
-                    <span className="text-muted">생성 방식</span>
-                    <span className="font-medium text-foreground">직접 만들기</span>
-                  </div>
-                  {config.prompt && (
-                    <div className="pt-2">
-                      <span className="text-muted text-sm block mb-2">프롬프트</span>
-                      <p className="text-sm text-foreground leading-relaxed bg-muted/50 p-3 rounded-lg">
-                        {config.prompt}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={handleGenerateImages}
-                  disabled={isGenerating}
-                  className="btn-primary w-full py-4 text-base disabled:opacity-50 flex items-center justify-center gap-3"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      이미지 생성 중...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="w-5 h-5" />
-                      이미지 생성하기
-                    </>
-                  )}
-                </button>
               </>
             )}
 
@@ -2260,60 +2764,6 @@ function CreatePageContent() {
                       })}
                     </div>
 
-                    {/* Generation Mode Selection */}
-                    <div className="p-4 rounded-xl bg-muted/30 border border-default">
-                      <h4 className="font-medium text-foreground mb-3">이미지 생성 방식 선택</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {/* Bulk Generation Option - Only shown if purpose is "ad" AND product is selected */}
-                        {config.purpose === "ad" && config.productId && (
-                          <button
-                            onClick={() => setGenerationMode("bulk")}
-                            className={`p-4 rounded-xl border-2 text-left transition-all ${
-                              generationMode === "bulk"
-                                ? "border-accent-500 bg-accent-500/10"
-                                : "border-default hover:border-muted"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-electric-500 to-electric-600 flex items-center justify-center">
-                                <Layers className="w-5 h-5 text-white" />
-                              </div>
-                              <div>
-                                <p className="font-semibold text-foreground">전체 생성</p>
-                                <p className="text-xs text-muted">모든 섹션을 한번에 생성</p>
-                              </div>
-                            </div>
-                            <p className="text-xs text-muted/80 leading-relaxed">
-                              모든 슬라이드의 이미지를 자동으로 생성합니다. 생성 후 개별적으로 수정할 수 있습니다.
-                            </p>
-                          </button>
-                        )}
-
-                        {/* Step-by-Step Generation Option - Always available */}
-                        <button
-                          onClick={() => setGenerationMode("step_by_step")}
-                          className={`p-4 rounded-xl border-2 text-left transition-all ${
-                            generationMode === "step_by_step"
-                              ? "border-accent-500 bg-accent-500/10"
-                              : "border-default hover:border-muted"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-glow-500 to-glow-600 flex items-center justify-center">
-                              <Wand2 className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-foreground">단계별 생성</p>
-                              <p className="text-xs text-muted">한 섹션씩 확인하며 생성</p>
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted/80 leading-relaxed">
-                            첫 번째 이미지를 레퍼런스로 사용하여 일관된 스타일로 순차 생성합니다.
-                          </p>
-                        </button>
-                      </div>
-                    </div>
-
                     {/* Storyboard Actions */}
                     <div className="flex gap-4">
                       <button
@@ -2326,10 +2776,10 @@ function CreatePageContent() {
                         다시 생성
                       </button>
                       <button
-                        onClick={() => handleConfirmStoryboard(generationMode)}
+                        onClick={() => handleConfirmStoryboard("bulk")}
                         className="btn-primary flex-1 flex items-center justify-center gap-2"
                       >
-                        {generationMode === "step_by_step" ? "단계별 생성 시작" : "전체 생성 시작"}
+                        스토리보드 확정
                         <ArrowRight className="w-4 h-4" />
                       </button>
                     </div>
@@ -2344,7 +2794,7 @@ function CreatePageContent() {
         {step === 5 && (
           <div className="space-y-8">
             {/* Single Image or Story Selection (existing behavior) */}
-            {(config.type === "single" || config.type === "story") && (
+            {(config.type === "single") && (
               <>
                 <div className="text-center">
                   <h2 className="font-display text-2xl font-bold text-foreground mb-2">
@@ -2569,8 +3019,7 @@ function CreatePageContent() {
                                       : "border-default hover:border-muted"
                                   }`}
                                 >
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
+                                  <FadeInImage
                                     src={img}
                                     alt={`Variant ${i + 1}`}
                                     className="w-full h-full object-cover"
@@ -2579,7 +3028,7 @@ function CreatePageContent() {
                                       target.style.display = 'none';
                                     }}
                                   />
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                     <ZoomIn className="w-8 h-8 text-white" />
                                   </div>
                                   {selectedIdx === i && (

@@ -130,6 +130,12 @@ class ImageProject(Base, TimestampMixin):
         nullable=True,
     )
 
+    # Reference images for style guidance (stored file paths)
+    reference_image_urls: Mapped[Optional[list]] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
     aspect_ratio: Mapped[str] = mapped_column(
         String(10),
         nullable=False,

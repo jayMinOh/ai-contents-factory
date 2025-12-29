@@ -567,8 +567,6 @@ async def delete_scene_image(
     if not scene_image:
         raise HTTPException(status_code=404, detail="Scene image not found")
 
-    # TODO: Delete from MinIO
-
     await db.delete(scene_image)
     await db.commit()
 

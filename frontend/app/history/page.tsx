@@ -50,10 +50,16 @@ export default function HistoryPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>("in_progress");
 
-  // Fetch all projects
+  // Fetch all projects with polling for in-progress projects
   const { data: projects, isLoading, error, refetch } = useQuery({
     queryKey: ["imageProjects"],
     queryFn: () => imageProjectApi.list({ limit: 100 }),
+    refetchInterval: (query) => {
+      // Poll every 3 seconds if there are generating projects
+      const data = query.state.data;
+      const hasGenerating = data?.some((p) => p.status === "generating");
+      return hasGenerating ? 3000 : false;
+    },
   });
 
   // Filter projects by status
@@ -67,13 +73,16 @@ export default function HistoryPage() {
 
   const displayProjects = activeTab === "in_progress" ? inProgressProjects : completedProjects;
 
-  // Handle continue project
-  const handleContinueProject = (project: ImageProject) => {
-    // Store project data in sessionStorage
-    sessionStorage.setItem("resumeProject", JSON.stringify(project));
-
-    // Navigate to create page with project context
-    router.push(`/create?resume=${project.id}&type=${project.content_type}`);
+  // Handle project click - navigate to appropriate page
+  const handleProjectClick = (project: ImageProject) => {
+    if (project.status === "completed" || project.status === "failed" || project.status === "generating") {
+      // Completed/Failed/Generating projects -> View details page
+      router.push(`/history/${project.id}`);
+    } else {
+      // Draft projects -> Continue in create page
+      sessionStorage.setItem("resumeProject", JSON.stringify(project));
+      router.push(`/create?resume=${project.id}&type=${project.content_type}`);
+    }
   };
 
   // Handle delete project
@@ -91,11 +100,13 @@ export default function HistoryPage() {
     }
   };
 
-  // Format date
+  // Format date (backend sends UTC, append Z to parse correctly)
   const formatDate = (dateString?: string) => {
     if (!dateString) return "";
     try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true, locale: ko });
+      // Append 'Z' if not present to indicate UTC
+      const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z';
+      return formatDistanceToNow(new Date(utcDateString), { addSuffix: true, locale: ko });
     } catch {
       return dateString;
     }
@@ -111,10 +122,20 @@ export default function HistoryPage() {
               <h1 className="text-2xl font-bold text-foreground">콘텐츠 히스토리</h1>
               <p className="text-muted text-sm mt-1">생성 중이거나 완료된 프로젝트를 관리하세요</p>
             </div>
-            <Link href="/create" className="btn-primary flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              새 콘텐츠 만들기
-            </Link>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => refetch()}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-default bg-card hover:bg-muted/50 transition-all"
+                title="새로고침"
+              >
+                <RefreshCw className="w-4 h-4" />
+                새로고침
+              </button>
+              <Link href="/create" className="btn-primary flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                새 콘텐츠 만들기
+              </Link>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -200,19 +221,19 @@ export default function HistoryPage() {
               const status = statusConfig[project.status] || statusConfig.draft;
               const ContentIcon = contentType.icon;
               const PurposeIcon = purpose.icon;
-              const firstImage = project.generated_images?.[0]?.image_url;
+              const thumbnailUrl = project.thumbnail_url;
 
               return (
                 <div
                   key={project.id}
-                  onClick={() => handleContinueProject(project)}
+                  onClick={() => handleProjectClick(project)}
                   className="group relative bg-card border border-default rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:border-accent-500/50 hover:shadow-lg hover:shadow-accent-500/5"
                 >
                   {/* Thumbnail */}
                   <div className="aspect-[4/3] bg-gradient-to-br from-muted/50 to-muted relative overflow-hidden">
-                    {firstImage ? (
+                    {thumbnailUrl ? (
                       <img
-                        src={`http://localhost:8000${firstImage}`}
+                        src={`http://localhost:8000${thumbnailUrl}`}
                         alt={project.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
@@ -228,7 +249,24 @@ export default function HistoryPage() {
                         <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
                       )}
                       {status.label}
+                      {project.status === "generating" && project.current_slide && project.storyboard_data?.slides && (
+                        <span className="ml-1">
+                          ({project.current_slide}/{project.storyboard_data.slides.length})
+                        </span>
+                      )}
                     </div>
+
+                    {/* Progress Bar for Generating */}
+                    {project.status === "generating" && project.storyboard_data?.slides && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30">
+                        <div
+                          className="h-full bg-accent-500 transition-all duration-500"
+                          style={{
+                            width: `${((project.current_slide || 0) / project.storyboard_data.slides.length) * 100}%`
+                          }}
+                        />
+                      </div>
+                    )}
 
                     {/* Content Type Badge */}
                     <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-xs font-medium bg-black/50 text-white backdrop-blur-sm flex items-center gap-1">

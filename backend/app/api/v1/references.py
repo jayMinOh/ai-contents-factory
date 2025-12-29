@@ -35,6 +35,17 @@ class AnalyzeRequest(BaseModel):
     extract_audio: bool = True
 
 
+class ScoreBreakdownItem(BaseModel):
+    score: float
+    weight: str
+    reason: str
+
+
+class ScoreBreakdown(BaseModel):
+    class Config:
+        extra = "allow"  # Allow dynamic keys
+
+
 class AnalysisResponse(BaseModel):
     analysis_id: str
     status: AnalysisStatus
@@ -71,6 +82,8 @@ class TimelineSegment(BaseModel):
     engagement_score: float
     techniques: List[str]
     score_reasoning: Optional[str] = None
+    score_breakdown: Optional[dict] = None
+    total_reason: Optional[str] = None
 
 
 class HookPoint(BaseModel):
@@ -81,6 +94,8 @@ class HookPoint(BaseModel):
     elements: Optional[List[str]] = []
     adaptable_template: Optional[str] = None
     score_reasoning: Optional[str] = None
+    score_breakdown: Optional[dict] = None
+    total_reason: Optional[str] = None
 
 
 class EdgePoint(BaseModel):
@@ -89,6 +104,8 @@ class EdgePoint(BaseModel):
     impact_score: float
     how_to_apply: str
     score_reasoning: Optional[str] = None
+    score_breakdown: Optional[dict] = None
+    total_reason: Optional[str] = None
 
 
 class EmotionalTrigger(BaseModel):
@@ -97,6 +114,8 @@ class EmotionalTrigger(BaseModel):
     intensity: float
     description: str
     score_reasoning: Optional[str] = None
+    score_breakdown: Optional[dict] = None
+    total_reason: Optional[str] = None
 
 
 class PainPoint(BaseModel):
@@ -119,6 +138,8 @@ class SellingPoint(BaseModel):
     persuasion_technique: str
     effectiveness: Optional[float] = None
     score_reasoning: Optional[str] = None
+    score_breakdown: Optional[dict] = None
+    total_reason: Optional[str] = None
 
 
 class CTAAnalysis(BaseModel):
@@ -128,6 +149,15 @@ class CTAAnalysis(BaseModel):
     barrier_removal: Optional[List[str]] = []
     effectiveness_score: Optional[float] = None
     score_reasoning: Optional[str] = None
+    score_breakdown: Optional[dict] = None
+    total_reason: Optional[str] = None
+
+
+class OverallEvaluation(BaseModel):
+    total_score: Optional[float] = None
+    one_line_review: Optional[str] = None
+    strengths: Optional[List[str]] = []
+    weaknesses: Optional[List[str]] = []
 
 
 class StructurePattern(BaseModel):
@@ -165,6 +195,7 @@ class AnalysisResult(BaseModel):
     tags: List[str] = []
     notes: Optional[str] = None
     error_message: Optional[str] = None
+    overall_evaluation: Optional[OverallEvaluation] = None
 
 
 class AnalysisUpdate(BaseModel):
@@ -232,6 +263,7 @@ def model_to_result(analysis: ReferenceAnalysis) -> AnalysisResult:
         tags=analysis.tags or [],
         notes=analysis.notes,
         error_message=analysis.error_message,
+        overall_evaluation=OverallEvaluation(**analysis.overall_evaluation) if analysis.overall_evaluation and isinstance(analysis.overall_evaluation, dict) else None,
     )
 
 
@@ -572,6 +604,7 @@ async def run_upload_analysis(
             analysis.structure_pattern = result.get("structure_pattern")
             analysis.recommendations = result.get("recommendations", [])
             analysis.transcript = result.get("transcript")
+            analysis.overall_evaluation = result.get("overall_evaluation")
 
             # Update title with AI-generated reference_name if available
             reference_name = result.get("reference_name")
@@ -742,6 +775,7 @@ async def run_analysis(analysis_id: str, url: str, extract_audio: bool):
             analysis.structure_pattern = result.get("structure_pattern")
             analysis.recommendations = result.get("recommendations", [])
             analysis.transcript = result.get("transcript")
+            analysis.overall_evaluation = result.get("overall_evaluation")
 
             # Update title with AI-generated reference_name if available
             reference_name = result.get("reference_name")

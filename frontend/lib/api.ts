@@ -5,13 +5,39 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true, // Send cookies for authentication
   timeout: 120000, // 2 minutes for long AI operations
 });
+
+// Response interceptor for 401 handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Redirect to login on authentication failure
+      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export interface AnalyzeRequest {
   url: string;
   title?: string;
   extract_audio?: boolean;
+}
+
+// Score breakdown for detailed scoring criteria
+export interface ScoreBreakdownItem {
+  score: number;
+  weight: string;
+  reason: string;
+}
+
+export interface ScoreBreakdown {
+  [key: string]: ScoreBreakdownItem;
 }
 
 export interface TimelineSegment {
@@ -23,6 +49,8 @@ export interface TimelineSegment {
   text_overlay?: string;
   engagement_score: number;
   score_reasoning?: string;
+  score_breakdown?: ScoreBreakdown;
+  total_reason?: string;
   techniques: string[];
 }
 
@@ -31,6 +59,8 @@ export interface HookPoint {
   hook_type: string;
   effectiveness_score: number;
   score_reasoning?: string;
+  score_breakdown?: ScoreBreakdown;
+  total_reason?: string;
   description?: string;
   elements?: string[];
   adaptable_template?: string;
@@ -41,6 +71,8 @@ export interface EdgePoint {
   description: string;
   impact_score: number;
   score_reasoning?: string;
+  score_breakdown?: ScoreBreakdown;
+  total_reason?: string;
   how_to_apply: string;
 }
 
@@ -49,6 +81,8 @@ export interface EmotionalTrigger {
   trigger_type: string;
   intensity: number;
   score_reasoning?: string;
+  score_breakdown?: ScoreBreakdown;
+  total_reason?: string;
   description: string;
 }
 
@@ -72,6 +106,8 @@ export interface SellingPoint {
   persuasion_technique: string;
   effectiveness?: number;
   score_reasoning?: string;
+  score_breakdown?: ScoreBreakdown;
+  total_reason?: string;
 }
 
 export interface CTAAnalysis {
@@ -81,6 +117,8 @@ export interface CTAAnalysis {
   barrier_removal: string[];
   effectiveness_score: number;
   score_reasoning?: string;
+  score_breakdown?: ScoreBreakdown;
+  total_reason?: string;
 }
 
 export interface StructurePattern {
@@ -94,6 +132,13 @@ export interface Recommendation {
   action: string;
   reason: string;
   example: string;
+}
+
+export interface OverallEvaluation {
+  total_score: number;
+  one_line_review: string;
+  strengths: string[];
+  weaknesses: string[];
 }
 
 export interface AnalysisResult {
@@ -118,6 +163,7 @@ export interface AnalysisResult {
   structure_pattern?: StructurePattern | string;
   recommendations: Recommendation[] | string[];
   transcript?: string;
+  overall_evaluation?: OverallEvaluation;
 }
 
 export const referenceApi = {
@@ -992,8 +1038,9 @@ export interface ConceptSuggestionRequest {
   generation_mode?: "reference" | "upload";
   // For reference mode
   reference_analysis_id?: string;
-  // For upload mode
-  reference_image_urls?: string[];
+  // For upload mode - base64 encoded images
+  reference_images_base64?: Array<{ data: string; mime_type: string }>;
+  reference_image_urls?: string[]; // Legacy, kept for compatibility
   user_prompt?: string;
   // Common fields
   brand_id?: string;
@@ -1137,14 +1184,21 @@ export interface ImageProject {
   reference_analysis_id?: string;
   storyboard_data?: ContentStoryboard;
   prompt?: string;
-  aspect_ratio: string;
+  aspect_ratio?: string;
   status: string;
-  current_step: number;
+  current_step?: number;
+  current_slide?: number;
+  thumbnail_url?: string;
   error_message?: string;
   completed_at?: string;
   created_at?: string;
   updated_at?: string;
-  generated_images: GeneratedImage[];
+  generated_images?: GeneratedImage[];
+}
+
+export interface ReferenceImageBase64 {
+  data: string;
+  mime_type: string;
 }
 
 export interface ImageProjectCreate {
@@ -1152,12 +1206,15 @@ export interface ImageProjectCreate {
   content_type: "single" | "carousel" | "story";
   purpose: "ad" | "info" | "lifestyle";
   method: "reference" | "prompt";
+  generation_mode?: "step_by_step" | "bulk";
   brand_id?: string;
   product_id?: string;
   reference_analysis_id?: string;
   storyboard_data?: ContentStoryboard;
   prompt?: string;
   aspect_ratio?: string;
+  // Reference images for style guidance (base64 encoded)
+  reference_images_base64?: ReferenceImageBase64[];
 }
 
 export interface GenerateImagesRequest {
@@ -1200,8 +1257,10 @@ export interface SetReferenceResponse {
 export interface RegenerateSectionResponse {
   project_id: string;
   slide_number: number;
-  images: GeneratedImage[];
+  deleted_count: number;
+  new_images: GeneratedImage[];
   generation_time_ms: number;
+  reference_image_used: boolean;
 }
 
 // ========== Image Project API ==========
@@ -1271,13 +1330,15 @@ export const imageProjectApi = {
   generateSection: async (
     projectId: string,
     slideNumber: number,
-    useReference?: boolean
+    useReference?: boolean,
+    prompt?: string
   ): Promise<GenerateSingleSectionResponse> => {
     const response = await api.post(
       `/image-projects/${projectId}/generate-section`,
       {
         slide_number: slideNumber,
         use_reference: useReference ?? true,
+        prompt: prompt || undefined,
       },
       {
         timeout: 300000, // 5 minutes for image generation
@@ -1308,6 +1369,42 @@ export const imageProjectApi = {
       }
     );
     return response.data;
+  },
+
+  // Start background image generation (returns immediately)
+  startBackgroundGeneration: async (
+    projectId: string
+  ): Promise<{ project_id: string; status: string; message: string; total_slides: number }> => {
+    const response = await api.post(`/image-projects/${projectId}/generate-background`);
+    return response.data;
+  },
+
+  // Download image with project aspect ratio applied
+  downloadImage: async (imageId: string, filename?: string): Promise<void> => {
+    const response = await api.get(`/image-projects/images/${imageId}/download`, {
+      responseType: 'blob',
+    });
+
+    // Get filename from response headers or use provided filename
+    const contentDisposition = response.headers['content-disposition'];
+    let downloadFilename = filename || `image_${imageId}.png`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+      if (filenameMatch) {
+        downloadFilename = filenameMatch[1];
+      }
+    }
+
+    // Create download link
+    const blob = new Blob([response.data], { type: response.headers['content-type'] || 'image/png' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = downloadFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   },
 };
 

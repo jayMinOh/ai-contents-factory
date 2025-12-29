@@ -43,6 +43,12 @@ class GeneratedImageResponse(GeneratedImageBase):
 
 # ========== Image Project Schemas ==========
 
+class ReferenceImageBase64(BaseModel):
+    """Schema for base64 encoded reference image."""
+    data: str
+    mime_type: str = Field(default="image/jpeg", pattern=r"^image/(jpeg|png|gif|webp)$")
+
+
 class ImageProjectCreate(BaseModel):
     """Schema for creating an image project."""
     title: Optional[str] = Field(None, max_length=255)
@@ -56,6 +62,8 @@ class ImageProjectCreate(BaseModel):
     storyboard_data: Optional[dict] = None
     prompt: Optional[str] = None
     aspect_ratio: str = Field(default="1:1", pattern=r"^\d+:\d+$")
+    # Reference images for style guidance (base64 encoded)
+    reference_images_base64: Optional[List[ReferenceImageBase64]] = None
 
 
 class ImageProjectUpdate(BaseModel):
@@ -105,7 +113,11 @@ class ImageProjectSummary(BaseModel):
     title: str
     content_type: str
     purpose: str
+    method: str
     status: str
+    current_slide: int = 1
+    storyboard_data: Optional[dict] = None
+    thumbnail_url: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -205,6 +217,7 @@ class GenerateSingleSectionRequest(BaseModel):
     """Schema for generating images for a single section/slide."""
     slide_number: int = Field(..., ge=1, description="Slide number to generate images for")
     use_reference: bool = Field(default=True, description="Whether to use reference image for style consistency")
+    prompt: Optional[str] = Field(default=None, description="Visual prompt for image generation. If not provided, extracted from storyboard_data.")
 
 
 class GenerateSingleSectionResponse(BaseModel):

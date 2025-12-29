@@ -59,7 +59,7 @@ Example output: "A sleek 30ml glass dropper bottle with frosted white finish, fe
             image_b64 = base64.b64encode(image_data).decode("utf-8")
 
             return self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-3-flash-preview",
                 contents=[
                     types.Content(
                         parts=[
@@ -192,7 +192,7 @@ IMPORTANT: For product images, the visual_prompt should be detailed enough that 
             image_b64 = base64.b64encode(image_data).decode("utf-8")
 
             return self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-3-flash-preview",
                 contents=[
                     types.Content(
                         parts=[

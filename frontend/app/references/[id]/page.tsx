@@ -41,16 +41,94 @@ import {
   StructurePattern,
   Recommendation,
   TimelineSegment,
+  OverallEvaluation,
 } from "@/lib/api";
 
-// Score indicator component
-function ScoreBar({ score, label, color, reasoning }: { score: number; label: string; color: string; reasoning?: string }) {
+// Score breakdown item type
+interface ScoreBreakdownItem {
+  score: number;
+  weight: string;
+  reason: string;
+}
+
+interface ScoreBreakdown {
+  [key: string]: ScoreBreakdownItem;
+}
+
+// Criterion name translation
+const criterionLabels: Record<string, string> = {
+  visual_impact: "시각적 임팩트",
+  info_density: "정보 밀도",
+  info_delivery: "정보 전달력",
+  emotional_appeal: "감정적 호소",
+  retention_power: "시청 유지력",
+  scroll_stopping: "스크롤 스토핑",
+  attention_grab: "주목도",
+  curiosity_trigger: "궁금증 유발",
+  memorability: "기억성",
+  reusability: "재활용성",
+  uniqueness: "독창성",
+  brand_fit: "브랜드 적합성",
+  scalability: "확장 가능성",
+  emotional_depth: "감정 자극 깊이",
+  trigger_clarity: "트리거 명확성",
+  action_motivation: "행동 유도",
+  claim_credibility: "주장 신뢰성",
+  evidence_strength: "근거 설득력",
+  conversion_potential: "전환 가능성",
+  clarity: "명확성",
+  urgency: "긴급성",
+  barrier_removal: "장벽 제거",
+  visual_prominence: "시각적 강조",
+};
+
+// Score indicator component with breakdown support
+function ScoreBar({
+  score,
+  label,
+  color,
+  reasoning,
+  scoreBreakdown,
+  totalReason
+}: {
+  score: number;
+  label: string;
+  color: string;
+  reasoning?: string;
+  scoreBreakdown?: ScoreBreakdown;
+  totalReason?: string;
+}) {
   const percentage = Math.round(score * 100);
+  const [showDetails, setShowDetails] = useState(false);
+
+  // Get color classes for breakdown items
+  const getBreakdownColor = (itemScore: number) => {
+    if (itemScore >= 0.8) return 'text-emerald-600 dark:text-emerald-400';
+    if (itemScore >= 0.6) return 'text-amber-600 dark:text-amber-400';
+    return 'text-rose-600 dark:text-rose-400';
+  };
+
+  const getBreakdownBg = (itemScore: number) => {
+    if (itemScore >= 0.8) return 'bg-emerald-500';
+    if (itemScore >= 0.6) return 'bg-amber-500';
+    return 'bg-rose-500';
+  };
+
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between items-center">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</span>
-        <span className={`text-xs font-bold ${color}`}>{percentage}%</span>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-bold ${color}`}>{percentage}%</span>
+          {scoreBreakdown && Object.keys(scoreBreakdown).length > 0 && (
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-blue-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              {showDetails ? '접기' : '상세'}
+            </button>
+          )}
+        </div>
       </div>
       <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
         <div
@@ -58,7 +136,41 @@ function ScoreBar({ score, label, color, reasoning }: { score: number; label: st
           style={{ width: `${percentage}%` }}
         />
       </div>
-      {reasoning && (
+
+      {/* Score Breakdown Details */}
+      {showDetails && scoreBreakdown && (
+        <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-2 border border-gray-100 dark:border-gray-700">
+          <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">평가 기준별 점수</p>
+          {Object.entries(scoreBreakdown).map(([key, item]) => (
+            <div key={key} className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-600 dark:text-gray-300">
+                  {criterionLabels[key] || key}
+                  <span className="text-gray-400 ml-1">({item.weight})</span>
+                </span>
+                <span className={`text-xs font-semibold ${getBreakdownColor(item.score)}`}>
+                  {Math.round(item.score * 100)}%
+                </span>
+              </div>
+              <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${getBreakdownBg(item.score)}`}
+                  style={{ width: `${Math.round(item.score * 100)}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 pl-1">{item.reason}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Total Reason (new format) or Reasoning (old format) */}
+      {totalReason && (
+        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1.5 bg-gradient-to-r from-gray-50 to-transparent dark:from-gray-800/30 dark:to-transparent p-2 rounded border-l-2 border-violet-400">
+          {totalReason}
+        </p>
+      )}
+      {!totalReason && reasoning && (
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
           "{reasoning}"
         </p>
@@ -122,8 +234,22 @@ export default function ReferenceDetailPage() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
   const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+  const [expandedCriteria, setExpandedCriteria] = useState<string | null>(null);
 
   const analysisId = params.id as string;
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isTimelineOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isTimelineOpen]);
 
   useEffect(() => {
     const loadAnalysis = async () => {
@@ -309,7 +435,12 @@ export default function ReferenceDetailPage() {
     return { totalScore: Math.round(totalScore), breakdown: scores };
   };
 
-  const { totalScore, breakdown } = calculateTotalScore();
+  const { totalScore: calculatedScore, breakdown } = calculateTotalScore();
+
+  // Use AI score if available, otherwise use calculated score
+  const totalScore = analysis.overall_evaluation?.total_score
+    ? Math.round(analysis.overall_evaluation.total_score * 100)
+    : calculatedScore;
 
   // Get color based on total score
   const getScoreColor = (score: number) => {
@@ -498,15 +629,28 @@ export default function ReferenceDetailPage() {
                 </div>
               )}
 
-              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-500 dark:text-gray-400">
-                {images.length > 0 ? (
-                  <p>총 {images.length}개 이미지</p>
-                ) : analysis.source_url?.includes("youtube") || analysis.source_url?.includes("youtu.be") ? (
-                  <p>{analysis.source_url?.includes("/shorts/") ? "YouTube 쇼츠" : "YouTube 영상"}</p>
-                ) : analysis.source_url?.includes("instagram") && analysis.source_url?.includes("/reel/") ? (
-                  <p>Instagram 릴스</p>
-                ) : (
-                  <p>미디어</p>
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-500 dark:text-gray-400 flex items-center justify-between">
+                <span>
+                  {images.length > 0 ? (
+                    `총 ${images.length}개 이미지`
+                  ) : analysis.source_url?.includes("youtube") || analysis.source_url?.includes("youtu.be") ? (
+                    analysis.source_url?.includes("/shorts/") ? "YouTube 쇼츠" : "YouTube 영상"
+                  ) : analysis.source_url?.includes("instagram") && analysis.source_url?.includes("/reel/") ? (
+                    "Instagram 릴스"
+                  ) : (
+                    "미디어"
+                  )}
+                </span>
+                {/* Timeline button */}
+                {analysis.segments && analysis.segments.length > 0 && (
+                  <button
+                    onClick={() => setIsTimelineOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/40 rounded-lg transition-colors"
+                    title="타임라인 보기"
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>타임라인</span>
+                  </button>
                 )}
               </div>
             </div>
@@ -592,6 +736,51 @@ export default function ReferenceDetailPage() {
                   <span className="text-white/80">개선 필요 (60 미만)</span>
                 </div>
               </div>
+
+              {/* AI One-line Review */}
+              {analysis.overall_evaluation?.one_line_review && (
+                <div className="mt-4 pt-4 border-t border-white/20">
+                  <p className="text-sm text-white/90 italic">
+                    &quot;{analysis.overall_evaluation.one_line_review}&quot;
+                  </p>
+                </div>
+              )}
+
+              {/* Strengths & Weaknesses */}
+              {analysis.overall_evaluation && (analysis.overall_evaluation.strengths?.length > 0 || analysis.overall_evaluation.weaknesses?.length > 0) && (
+                <div className="mt-4 pt-4 border-t border-white/20 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {analysis.overall_evaluation.strengths && analysis.overall_evaluation.strengths.length > 0 && (
+                    <div className="bg-white/10 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-emerald-300 mb-2 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> 잘한 점
+                      </p>
+                      <ul className="space-y-1">
+                        {analysis.overall_evaluation.strengths.map((s, i) => (
+                          <li key={i} className="text-xs text-white/80 flex items-start gap-1.5">
+                            <span className="text-emerald-400 mt-0.5">+</span>
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {analysis.overall_evaluation.weaknesses && analysis.overall_evaluation.weaknesses.length > 0 && (
+                    <div className="bg-white/10 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-amber-300 mb-2 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> 개선점
+                      </p>
+                      <ul className="space-y-1">
+                        {analysis.overall_evaluation.weaknesses.map((w, i) => (
+                          <li key={i} className="text-xs text-white/80 flex items-start gap-1.5">
+                            <span className="text-amber-400 mt-0.5">-</span>
+                            <span>{w}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Recommendations - Moved to top */}
@@ -662,6 +851,8 @@ export default function ReferenceDetailPage() {
                   label="CTA 효과성"
                   color="text-rose-500"
                   reasoning={analysis.cta_analysis.score_reasoning}
+                  scoreBreakdown={analysis.cta_analysis.score_breakdown as ScoreBreakdown}
+                  totalReason={analysis.cta_analysis.total_reason}
                 />
                 {analysis.cta_analysis.urgency_elements?.length > 0 && (
                   <div className="mt-4">
@@ -723,7 +914,7 @@ export default function ReferenceDetailPage() {
                     <span className="text-xs text-gray-500">{hook.timestamp}</span>
                   </div>
                   <p className="text-sm text-gray-700 dark:text-gray-300">{hook.description}</p>
-                  <ScoreBar score={hook.effectiveness_score} label="효과성" color="text-amber-500" reasoning={hook.score_reasoning} />
+                  <ScoreBar score={hook.effectiveness_score} label="효과성" color="text-amber-500" reasoning={hook.score_reasoning} scoreBreakdown={hook.score_breakdown as ScoreBreakdown} totalReason={hook.total_reason} />
                   {hook.adaptable_template && (
                     <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">활용 템플릿</p>
@@ -749,7 +940,7 @@ export default function ReferenceDetailPage() {
                     {edge.category}
                   </span>
                   <p className="text-sm text-gray-700 dark:text-gray-300">{edge.description}</p>
-                  <ScoreBar score={edge.impact_score} label="임팩트" color="text-blue-500" reasoning={edge.score_reasoning} />
+                  <ScoreBar score={edge.impact_score} label="임팩트" color="text-blue-500" reasoning={edge.score_reasoning} scoreBreakdown={edge.score_breakdown as ScoreBreakdown} totalReason={edge.total_reason} />
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">적용 방법</p>
                     <p className="text-xs text-gray-600 dark:text-gray-400">{edge.how_to_apply}</p>
@@ -776,7 +967,7 @@ export default function ReferenceDetailPage() {
                     <span className="text-xs text-gray-500">{trigger.timestamp}</span>
                   </div>
                   <p className="text-sm text-gray-700 dark:text-gray-300">{trigger.description}</p>
-                  <ScoreBar score={trigger.intensity} label="강도" color="text-rose-500" reasoning={trigger.score_reasoning} />
+                  <ScoreBar score={trigger.intensity} label="강도" color="text-rose-500" reasoning={trigger.score_reasoning} scoreBreakdown={trigger.score_breakdown as ScoreBreakdown} totalReason={trigger.total_reason} />
                 </div>
               ))}
             </AnalysisCard>
@@ -829,7 +1020,7 @@ export default function ReferenceDetailPage() {
                     </span>
                   </div>
                   {sell.effectiveness !== undefined && (
-                    <ScoreBar score={sell.effectiveness} label="효과성" color="text-emerald-500" reasoning={sell.score_reasoning} />
+                    <ScoreBar score={sell.effectiveness} label="효과성" color="text-emerald-500" reasoning={sell.score_reasoning} scoreBreakdown={sell.score_breakdown as ScoreBreakdown} totalReason={sell.total_reason} />
                   )}
                 </div>
               ))}
@@ -849,6 +1040,194 @@ export default function ReferenceDetailPage() {
           </div>
         )}
       </main>
+
+      {/* Timeline Modal */}
+      {isTimelineOpen && analysis.segments && analysis.segments.length > 0 && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setIsTimelineOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-2xl max-h-[80vh] shadow-2xl border border-gray-200 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-200 flex flex-col mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">타임라인</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{analysis.segments.length}개 세그먼트</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsTimelineOpen(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Engagement Score Legend */}
+            <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="w-4 h-4 text-amber-500" />
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">참여도 평가 기준</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                {/* 시각적 자극 */}
+                <div>
+                  <button
+                    onClick={() => setExpandedCriteria(expandedCriteria === "visual" ? null : "visual")}
+                    className="flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-violet-500"></span>
+                    <span>시각적 자극 25%</span>
+                    <ChevronRight className={`w-3 h-3 transition-transform ${expandedCriteria === "visual" ? "rotate-90" : ""}`} />
+                  </button>
+                  {expandedCriteria === "visual" && (
+                    <p className="mt-1 ml-3 text-[10px] text-gray-400 dark:text-gray-500">
+                      화면 움직임, 색상 대비, 줌인/아웃, 전환 효과
+                    </p>
+                  )}
+                </div>
+                {/* 정보 밀도 */}
+                <div>
+                  <button
+                    onClick={() => setExpandedCriteria(expandedCriteria === "info" ? null : "info")}
+                    className="flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    <span>정보 밀도 25%</span>
+                    <ChevronRight className={`w-3 h-3 transition-transform ${expandedCriteria === "info" ? "rotate-90" : ""}`} />
+                  </button>
+                  {expandedCriteria === "info" && (
+                    <p className="mt-1 ml-3 text-[10px] text-gray-400 dark:text-gray-500">
+                      새로운 정보 전달 속도, 시청자가 얻는 가치
+                    </p>
+                  )}
+                </div>
+                {/* 감정적 자극 */}
+                <div>
+                  <button
+                    onClick={() => setExpandedCriteria(expandedCriteria === "emotion" ? null : "emotion")}
+                    className="flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span>감정적 자극 25%</span>
+                    <ChevronRight className={`w-3 h-3 transition-transform ${expandedCriteria === "emotion" ? "rotate-90" : ""}`} />
+                  </button>
+                  {expandedCriteria === "emotion" && (
+                    <p className="mt-1 ml-3 text-[10px] text-gray-400 dark:text-gray-500">
+                      궁금증, 긴장감, 공감, 흥미 유발 정도
+                    </p>
+                  )}
+                </div>
+                {/* 시청 유지력 */}
+                <div>
+                  <button
+                    onClick={() => setExpandedCriteria(expandedCriteria === "retention" ? null : "retention")}
+                    className="flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>시청 유지력 25%</span>
+                    <ChevronRight className={`w-3 h-3 transition-transform ${expandedCriteria === "retention" ? "rotate-90" : ""}`} />
+                  </button>
+                  {expandedCriteria === "retention" && (
+                    <p className="mt-1 ml-3 text-[10px] text-gray-400 dark:text-gray-500">
+                      다음 내용을 계속 보고 싶게 만드는 힘
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Timeline Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-3">
+                {analysis.segments.map((segment, index) => {
+                  const formatTime = (seconds: number) => {
+                    const mins = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return `${mins}:${secs.toString().padStart(2, "0")}`;
+                  };
+                  const getSegmentColor = (type: string) => {
+                    const colors: Record<string, string> = {
+                      hook: "bg-rose-500",
+                      intro: "bg-violet-500",
+                      problem: "bg-amber-500",
+                      solution: "bg-emerald-500",
+                      benefit: "bg-cyan-500",
+                      social_proof: "bg-blue-500",
+                      cta: "bg-pink-500",
+                      outro: "bg-slate-500",
+                    };
+                    return colors[type.toLowerCase()] || "bg-gray-500";
+                  };
+                  return (
+                    <div
+                      key={index}
+                      className="group relative bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      {/* Time and Type Header */}
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-sm font-mono font-semibold text-gray-900 dark:text-white">
+                          {formatTime(segment.start_time)} - {formatTime(segment.end_time)}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium text-white ${getSegmentColor(segment.segment_type)}`}>
+                          {segment.segment_type}
+                        </span>
+                        {segment.engagement_score > 0 && (
+                          <span className="ml-auto text-xs font-medium text-amber-600 dark:text-amber-400">
+                            참여도 {Math.round(segment.engagement_score * 100)}%
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Visual Description */}
+                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {segment.visual_description}
+                      </p>
+
+                      {/* Audio Transcript */}
+                      {segment.audio_transcript && (
+                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                            &quot;{segment.audio_transcript}&quot;
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Text Overlay */}
+                      {segment.text_overlay && (
+                        <div className="mt-2 inline-block px-2 py-1 bg-violet-100 dark:bg-violet-900/30 rounded text-xs font-medium text-violet-700 dark:text-violet-300">
+                          텍스트: {segment.text_overlay}
+                        </div>
+                      )}
+
+                      {/* Techniques */}
+                      {segment.techniques && segment.techniques.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {segment.techniques.map((tech, i) => (
+                            <span
+                              key={i}
+                              className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400"
+                            >
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

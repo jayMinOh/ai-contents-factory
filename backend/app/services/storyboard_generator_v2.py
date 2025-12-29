@@ -204,7 +204,7 @@ The JSON must have this structure:
       "section_type": "hook",
       "title": "Slide title in {language}",
       "description": "Detailed description of this slide's content and message in {language}",
-      "visual_prompt": "Detailed English prompt for AI image generation. Include: subject, composition, lighting, style, mood, colors, background. Be specific and descriptive.",
+      "visual_prompt": "Detailed English prompt for AI image generation. CRITICAL: First determine the appropriate MEDIUM based on the style/reference: (1) If anime/illustration style → '2D digital illustration, artwork, NOT a photograph' (2) If realistic/product style → 'professional product photography' (3) If lifestyle → 'natural photo style'. Always START with the medium (e.g., '2D anime illustration of...' or 'Product photo of...'). Then include: subject, composition, lighting, style, mood, colors, background.",
       "visual_prompt_display": "Same visual prompt content but written in {language} for user display",
       "text_overlay": "Text to display on the slide in {language}",
       "narration_script": "Optional narration script in {language}",

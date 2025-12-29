@@ -39,7 +39,7 @@ class GeminiImageEditor:
             raise ValueError("GOOGLE_API_KEY is not configured")
 
         self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
-        # Use Gemini 3 Pro Image Preview - advanced model with 4K support and better quality
+        # Use Gemini 3 Pro Image Preview - high-quality 4K image generation
         self.model_name = "gemini-3-pro-image-preview"
         logger.info(f"GeminiImageEditor initialized with model: {self.model_name}")
 

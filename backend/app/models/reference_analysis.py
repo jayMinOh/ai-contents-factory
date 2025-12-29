@@ -164,6 +164,12 @@ class ReferenceAnalysis(Base, TimestampMixin):
         nullable=True,
     )
 
+    # AI overall evaluation (one-line review, strengths, weaknesses)
+    overall_evaluation: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
     def __repr__(self) -> str:
         return f"<ReferenceAnalysis(id={self.id!r}, title={self.title!r}, status={self.status!r})>"
 

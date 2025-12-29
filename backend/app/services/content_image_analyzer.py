@@ -152,7 +152,7 @@ Return ONLY valid JSON, no additional text."""
             image_b64 = base64.b64encode(image_data).decode("utf-8")
 
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-3-flash-preview",
                 contents=[
                     types.Content(
                         parts=[

@@ -170,7 +170,7 @@ The JSON must have this structure:
   "visual_concept": "Detailed visual concept description in {language}. Describe the layout, composition, focal point, and how elements are arranged. Example: '세로형의 긴 공간을 활용해 상품을 상단에, 하단엔 후킹 문구를 배치합니다.'",
   "copy_suggestion": "Hooking text/copy suggestion based on reference analysis in {language}. Example: '레퍼런스에서 분석된 \"3초 후킹\" 카피: [이걸로 피부 고민 끝]'",
   "style_recommendation": "Style and tone recommendations in {language} based on purpose. Example: '일상/감성 모드에 맞춰 자연광 느낌의 텍스처 적용'",
-  "visual_prompt": "Detailed English prompt for AI image generation. Include: subject, composition, lighting, style, mood, colors, background. Be specific and descriptive. Must be optimized for image generators.",
+  "visual_prompt": "Detailed English prompt for AI image generation. CRITICAL: First determine the appropriate MEDIUM based on the style/reference: (1) If anime/illustration style requested → use '2D digital illustration, artwork, NOT a photograph' (2) If realistic/product style → use 'professional product photography, studio shot' (3) If lifestyle/casual → use 'natural candid photo style'. Always START the prompt by explicitly stating the medium (e.g., '2D anime illustration of...' or 'Professional product photo of...'). Then include: subject, composition, lighting, style, mood, colors, background. Be specific about the visual medium to prevent style confusion.",
   "visual_prompt_display": "Same visual prompt content but written in {language} for user display",
   "text_overlay_suggestion": "Suggested text to overlay on the image in {language}. Should be short, impactful, and readable."
 }}

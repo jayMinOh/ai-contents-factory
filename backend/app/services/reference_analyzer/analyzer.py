@@ -112,6 +112,7 @@ class ReferenceAnalyzer:
                 "structure_pattern": analysis.get("structure_pattern", {}),
                 "recommendations": analysis.get("recommendations", []),
                 "transcript": analysis.get("transcript"),
+                "overall_evaluation": analysis.get("overall_evaluation", {}),
             }
 
         finally:
@@ -259,9 +260,10 @@ class ReferenceAnalyzer:
 - 길이: {duration:.1f}초
 - 프레임 수: {len(frames)}개 (샘플: {len(sampled_frames)}개)
 
-다음 항목들을 마케팅 관점에서 분석해주세요:
+다음 항목들을 마케팅 관점에서 **철저하고 상세하게** 분석해주세요.
+**중요**: 각 항목을 가능한 한 많이 찾아내세요. 예시는 형식 참고용이며, 실제로는 발견되는 모든 요소를 포함해야 합니다.
 
-1. **타임라인 세그먼트**: 영상 전체 길이({duration:.1f}초)를 빠짐없이 분석하여 각 구간의 유형과 역할을 파악
+1. **타임라인 세그먼트** (영상 전체를 빠짐없이 커버): 영상 전체 길이({duration:.1f}초)를 빠짐없이 분석하여 각 구간의 유형과 역할을 파악
    - hook: 주목 끌기 (보통 0-3초)
    - problem: 문제/고충점 제기
    - agitation: 문제 심화/감정 자극
@@ -280,32 +282,36 @@ class ReferenceAnalyzer:
 
    예시: hook 구간에서 강렬한 비주얼+궁금증 유발 = 0.9, 단조로운 설명 = 0.4
 
-2. **후킹 포인트**: 시청자가 스크롤을 멈추는 순간
+2. **후킹 포인트** (최소 2-5개 이상 찾기): 시청자가 스크롤을 멈추는 순간
    - 기법: curiosity_gap(궁금증 유발), pattern_interrupt(패턴 파괴), shocking_statement(충격적 발언), question(질문형), contradiction(역설)
    - 효과 점수와 재사용 가능한 템플릿
+   - 영상 전체에서 발견되는 모든 후킹 요소를 빠짐없이 추출
 
-3. **엣지 포인트**: 경쟁사와 차별화되는 독특한 요소
+3. **엣지 포인트** (최소 3-5개 이상 찾기): 경쟁사와 차별화되는 독특한 요소
    - 시각적 차별화 (색상, 구도, 스타일)
    - 메시지 차별화 (톤앤매너, 표현 방식)
    - 포지셔닝 차별화
+   - 각 카테고리별로 최소 1개 이상 분석
 
-4. **감정 트리거**: 소비자 심리를 자극하는 요소
+4. **감정 트리거** (최소 3-5개 이상 찾기): 소비자 심리를 자극하는 요소
    - FOMO(놓칠까봐 두려움), 공포/불안, 희망/기대, 욕망, 소속감, 자아실현
    - 각 트리거가 나타나는 시점과 강도
+   - 영상에서 사용된 모든 감정 자극 요소 분석
 
-5. **페인포인트 활용**: 소비자 고충점을 어떻게 건드리는가
+5. **페인포인트 활용** (최소 2-4개 이상 찾기): 소비자 고충점을 어떻게 건드리는가
    - 명시적 페인포인트 (직접 언급)
    - 암시적 페인포인트 (이미지/상황으로 암시)
    - 공감 유도 기법
 
-6. **활용 포인트**: 이 영상에서 바로 적용할 수 있는 요소
-   - 복사 가능한 문구/스크립트 템플릿
-   - 재현 가능한 촬영 기법
-   - 적용 가능한 편집 패턴
+6. **활용 포인트** (최소 5-8개 이상 찾기): 이 영상에서 바로 적용할 수 있는 요소
+   - 복사 가능한 문구/스크립트 템플릿 (최소 2개)
+   - 재현 가능한 촬영 기법 (최소 2개)
+   - 적용 가능한 편집 패턴 (최소 2개)
 
-7. **셀링 포인트**: 설득의 핵심 요소
+7. **셀링 포인트** (최소 3-5개 이상 찾기): 설득의 핵심 요소
    - 주장(claim)과 근거(evidence)
    - 설득 기법: social_proof, scarcity, authority, reciprocity, liking, commitment
+   - 영상에서 사용된 모든 설득 요소 분석
 
 8. **CTA 분석**: 행동 유도 전략
    - CTA 유형과 위치
@@ -316,24 +322,116 @@ class ReferenceAnalyzer:
 
 10. **적용 권장사항**: 이 영상의 성공 요소를 내 영상에 적용하는 구체적 방법 5개
 
+**중요 - 점수 피드백 형식**:
+모든 점수에 대해 반드시 **평가 기준별 세부 점수와 이유**를 제공하세요.
+
+**engagement_score (세그먼트용)**:
+"score_breakdown": {{
+  "visual_impact": {{"score": 0.85, "weight": "25%", "reason": "구체적인 평가 이유"}},
+  "info_density": {{"score": 0.7, "weight": "25%", "reason": "구체적인 평가 이유"}},
+  "emotional_appeal": {{"score": 0.9, "weight": "25%", "reason": "구체적인 평가 이유"}},
+  "retention_power": {{"score": 0.8, "weight": "25%", "reason": "구체적인 평가 이유"}}
+}},
+"total_reason": "위 기준들을 종합한 최종 점수 산출 이유"
+
+**effectiveness_score (후킹 포인트용)**:
+"score_breakdown": {{
+  "attention_grab": {{"score": 0.9, "weight": "30%", "reason": "스크롤 멈춤 효과 평가"}},
+  "curiosity_trigger": {{"score": 0.8, "weight": "30%", "reason": "궁금증 유발 정도"}},
+  "memorability": {{"score": 0.7, "weight": "20%", "reason": "기억에 남는 정도"}},
+  "reusability": {{"score": 0.85, "weight": "20%", "reason": "다른 콘텐츠에 재활용 가능성"}}
+}},
+"total_reason": "종합 평가 이유"
+
+**impact_score (엣지 포인트용)**:
+"score_breakdown": {{
+  "uniqueness": {{"score": 0.9, "weight": "40%", "reason": "경쟁사 대비 독창성"}},
+  "brand_fit": {{"score": 0.8, "weight": "30%", "reason": "브랜드 아이덴티티 적합성"}},
+  "scalability": {{"score": 0.7, "weight": "30%", "reason": "다른 콘텐츠에 확장 적용 가능성"}}
+}},
+"total_reason": "종합 평가 이유"
+
+**intensity (감정 트리거용)**:
+"score_breakdown": {{
+  "emotional_depth": {{"score": 0.85, "weight": "40%", "reason": "감정 자극 깊이"}},
+  "trigger_clarity": {{"score": 0.9, "weight": "30%", "reason": "감정 트리거의 명확성"}},
+  "action_motivation": {{"score": 0.8, "weight": "30%", "reason": "행동 유도 연결성"}}
+}},
+"total_reason": "종합 평가 이유"
+
+**effectiveness (셀링 포인트용)**:
+"score_breakdown": {{
+  "claim_credibility": {{"score": 0.8, "weight": "35%", "reason": "주장의 신뢰성"}},
+  "evidence_strength": {{"score": 0.85, "weight": "35%", "reason": "근거의 설득력"}},
+  "conversion_potential": {{"score": 0.9, "weight": "30%", "reason": "구매 전환 가능성"}}
+}},
+"total_reason": "종합 평가 이유"
+
+**cta_analysis.effectiveness_score**:
+"score_breakdown": {{
+  "clarity": {{"score": 0.9, "weight": "30%", "reason": "CTA 메시지 명확성"}},
+  "urgency": {{"score": 0.7, "weight": "25%", "reason": "긴급성/희소성 요소"}},
+  "barrier_removal": {{"score": 0.8, "weight": "25%", "reason": "행동 장벽 제거 정도"}},
+  "visual_prominence": {{"score": 0.85, "weight": "20%", "reason": "시각적 눈에 띔 정도"}}
+}},
+"total_reason": "종합 평가 이유"
+
 **중요**: segments는 영상 전체 길이({duration:.1f}초)를 빠짐없이 커버해야 합니다. 처음부터 끝까지 모든 구간을 분석하세요.
 
 JSON 형식으로만 응답하세요:
 ```json
 {{
-  "reference_name": "분석 결과를 바탕으로 이 콘텐츠의 핵심 내용을 설명하는 한국어 문장 (30자 이내, 예: '발리 해변에서 서핑하는 여행 브이로그', '신제품 화장품 사용 후기 리뷰 영상')",
+  "reference_name": "분석 결과를 바탕으로 이 콘텐츠의 핵심 내용을 설명하는 한국어 문장 (30자 이내)",
   "segments": [
-    {{"start_time": 0.0, "end_time": 3.0, "segment_type": "hook", "visual_description": "설명", "engagement_score": 0.9, "score_reasoning": "이 점수를 준 구체적 이유", "techniques": ["기법"]}},
-    {{"start_time": 3.0, "end_time": 8.0, "segment_type": "problem", "visual_description": "설명", "engagement_score": 0.7, "score_reasoning": "이 점수를 준 구체적 이유", "techniques": ["기법"]}}
+    {{
+      "start_time": 0.0, "end_time": 3.0, "segment_type": "hook",
+      "visual_description": "설명", "engagement_score": 0.85,
+      "score_breakdown": {{
+        "visual_impact": {{"score": 0.9, "weight": "25%", "reason": "강렬한 색상 대비와 빠른 줌인으로 시선 집중"}},
+        "info_density": {{"score": 0.8, "weight": "25%", "reason": "핵심 메시지가 3초 내 전달됨"}},
+        "emotional_appeal": {{"score": 0.85, "weight": "25%", "reason": "궁금증과 기대감 효과적 유발"}},
+        "retention_power": {{"score": 0.85, "weight": "25%", "reason": "다음 장면 보고 싶은 욕구 자극"}}
+      }},
+      "total_reason": "시각적 임팩트와 감정 자극이 조화롭게 작용하여 높은 engagement 달성",
+      "techniques": ["기법"]
+    }}
   ],
   "hook_points": [
-    {{"timestamp": "0:00-0:03", "hook_type": "curiosity_gap", "effectiveness_score": 0.85, "score_reasoning": "이 효과성 점수를 준 구체적 이유", "description": "설명", "adaptable_template": "템플릿 문구"}}
+    {{
+      "timestamp": "0:00-0:03", "hook_type": "curiosity_gap", "effectiveness_score": 0.85,
+      "score_breakdown": {{
+        "attention_grab": {{"score": 0.9, "weight": "30%", "reason": "예상치 못한 질문으로 즉시 주목"}},
+        "curiosity_trigger": {{"score": 0.85, "weight": "30%", "reason": "답을 알고 싶은 욕구 강하게 유발"}},
+        "memorability": {{"score": 0.8, "weight": "20%", "reason": "독특한 표현으로 기억에 남음"}},
+        "reusability": {{"score": 0.85, "weight": "20%", "reason": "다양한 제품에 쉽게 적용 가능한 구조"}}
+      }},
+      "total_reason": "질문형 후킹으로 시청자 참여 유도에 성공",
+      "description": "설명", "adaptable_template": "템플릿 문구"
+    }}
   ],
   "edge_points": [
-    {{"category": "visual", "description": "차별화 요소 설명", "impact_score": 0.8, "score_reasoning": "이 임팩트 점수를 준 구체적 이유", "how_to_apply": "적용 방법"}}
+    {{
+      "category": "visual", "description": "차별화 요소 설명", "impact_score": 0.8,
+      "score_breakdown": {{
+        "uniqueness": {{"score": 0.85, "weight": "40%", "reason": "경쟁사에서 볼 수 없는 앵글과 색감"}},
+        "brand_fit": {{"score": 0.8, "weight": "30%", "reason": "브랜드 톤앤매너와 일관성 있음"}},
+        "scalability": {{"score": 0.75, "weight": "30%", "reason": "다른 제품 라인에도 적용 가능"}}
+      }},
+      "total_reason": "독창적인 비주얼 스타일이 브랜드 차별화에 기여",
+      "how_to_apply": "적용 방법"
+    }}
   ],
   "emotional_triggers": [
-    {{"timestamp": "0:05-0:10", "trigger_type": "FOMO", "intensity": 0.9, "score_reasoning": "이 강도 점수를 준 구체적 이유", "description": "어떻게 감정을 자극하는지"}}
+    {{
+      "timestamp": "0:05-0:10", "trigger_type": "FOMO", "intensity": 0.9,
+      "score_breakdown": {{
+        "emotional_depth": {{"score": 0.9, "weight": "40%", "reason": "한정 수량 강조로 긴박감 조성"}},
+        "trigger_clarity": {{"score": 0.85, "weight": "30%", "reason": "놓치면 후회할 것이라는 메시지 명확"}},
+        "action_motivation": {{"score": 0.9, "weight": "30%", "reason": "즉시 구매 행동으로 연결"}}
+      }},
+      "total_reason": "긴급성과 희소성이 복합적으로 작용하여 강력한 FOMO 유발",
+      "description": "어떻게 감정을 자극하는지"
+    }}
   ],
   "pain_points": [
     {{"timestamp": "0:03-0:08", "pain_type": "explicit", "description": "페인포인트 내용", "empathy_technique": "공감 유도 기법"}}
@@ -344,7 +442,16 @@ JSON 형식으로만 응답하세요:
     {{"type": "editing_pattern", "content": "편집 패턴", "context": "적용 방법"}}
   ],
   "selling_points": [
-    {{"timestamp": "0:10-0:15", "claim": "주장", "evidence_type": "demonstration", "persuasion_technique": "social_proof", "effectiveness": 0.85, "score_reasoning": "이 효과성 점수를 준 구체적 이유"}}
+    {{
+      "timestamp": "0:10-0:15", "claim": "주장", "evidence_type": "demonstration",
+      "persuasion_technique": "social_proof", "effectiveness": 0.85,
+      "score_breakdown": {{
+        "claim_credibility": {{"score": 0.8, "weight": "35%", "reason": "구체적 수치로 신뢰도 확보"}},
+        "evidence_strength": {{"score": 0.9, "weight": "35%", "reason": "실제 사용 영상이 강력한 증거"}},
+        "conversion_potential": {{"score": 0.85, "weight": "30%", "reason": "구매 결정에 직접적 영향"}}
+      }},
+      "total_reason": "실증적 증거와 신뢰성 있는 주장이 설득력 있게 결합됨"
+    }}
   ],
   "cta_analysis": {{
     "cta_type": "direct/soft/implied",
@@ -352,7 +459,13 @@ JSON 형식으로만 응답하세요:
     "urgency_elements": ["한정 수량", "기간 한정"],
     "barrier_removal": ["무료 체험", "환불 보장"],
     "effectiveness_score": 0.8,
-    "score_reasoning": "이 CTA 효과성 점수를 준 구체적 이유"
+    "score_breakdown": {{
+      "clarity": {{"score": 0.85, "weight": "30%", "reason": "링크 클릭이라는 행동 지시가 명확"}},
+      "urgency": {{"score": 0.75, "weight": "25%", "reason": "오늘만 특가라는 시간 제한 효과적"}},
+      "barrier_removal": {{"score": 0.8, "weight": "25%", "reason": "무료 배송으로 구매 장벽 낮춤"}},
+      "visual_prominence": {{"score": 0.8, "weight": "20%", "reason": "CTA 버튼이 눈에 잘 띔"}}
+    }},
+    "total_reason": "명확한 행동 지시와 장벽 제거 전략이 효과적으로 결합됨"
   }},
   "structure_pattern": {{
     "framework": "PAS",
@@ -362,7 +475,13 @@ JSON 형식으로만 응답하세요:
   "transcript": "영상 텍스트/나레이션",
   "recommendations": [
     {{"priority": 1, "action": "구체적 행동", "reason": "이유", "example": "예시"}}
-  ]
+  ],
+  "overall_evaluation": {{
+    "total_score": 0.82,
+    "one_line_review": "후킹과 감정 자극이 탁월하나, CTA 명확성과 사회적 증거가 보강되면 더욱 효과적일 것",
+    "strengths": ["강력한 첫 3초 후킹으로 이탈률 최소화", "FOMO 활용한 감정 자극이 효과적"],
+    "weaknesses": ["CTA가 다소 늦게 등장", "구체적인 수치 증거 부족"]
+  }}
 }}
 ```"""
 
@@ -560,6 +679,7 @@ JSON 형식으로만 응답하세요:
                 "structure_pattern": analysis.get("structure_pattern", {}),
                 "recommendations": analysis.get("recommendations", []),
                 "transcript": analysis.get("transcript"),
+                "overall_evaluation": analysis.get("overall_evaluation", {}),
             }
 
         except Exception as e:
@@ -582,9 +702,10 @@ JSON 형식으로만 응답하세요:
 - 이미지 수: {image_count}개 {'(캐러셀 게시물)' if is_carousel else '(단일 이미지)'}
 - 플랫폼: {'Instagram' if 'instagram' in source_url.lower() else 'Facebook' if 'facebook' in source_url.lower() else 'SNS'}
 
-다음 항목들을 마케팅 관점에서 분석해주세요:
+다음 항목들을 마케팅 관점에서 **철저하고 상세하게** 분석해주세요.
+**중요**: 각 항목을 가능한 한 많이 찾아내세요. 예시는 형식 참고용이며, 실제로는 발견되는 모든 요소를 포함해야 합니다.
 
-1. **이미지 세그먼트**: 각 이미지(슬라이드)의 역할과 마케팅 기능
+1. **이미지 세그먼트** (모든 이미지를 분석): 각 이미지(슬라이드)의 역할과 마케팅 기능
    - hook: 주목 끌기 (보통 첫 번째 이미지)
    - problem: 문제/고충점 제기
    - solution: 해결책 제시
@@ -600,28 +721,32 @@ JSON 형식으로만 응답하세요:
    - 감정적 호소 (25%): 공감, 욕망 자극
    - 스크롤 스토핑력 (20%): 첫 인상의 강렬함
 
-2. **후킹 포인트**: 스크롤을 멈추게 하는 요소
+2. **후킹 포인트** (최소 2-5개 이상 찾기): 스크롤을 멈추게 하는 요소
    - 기법: curiosity_gap(궁금증), pattern_interrupt(패턴 파괴), bold_claim(대담한 주장), visual_contrast(시각적 대비), question(질문형)
    - 효과 점수와 재사용 가능한 템플릿
+   - 이미지에서 발견되는 모든 후킹 요소를 빠짐없이 추출
 
-3. **엣지 포인트**: 경쟁사와 차별화되는 독특한 요소
+3. **엣지 포인트** (최소 3-5개 이상 찾기): 경쟁사와 차별화되는 독특한 요소
    - 시각적 차별화 (색상, 구도, 스타일)
    - 메시지 차별화 (카피, 톤앤매너)
    - 브랜딩 차별화
+   - 각 카테고리별로 최소 1개 이상 분석
 
-4. **감정 트리거**: 소비자 심리를 자극하는 요소
+4. **감정 트리거** (최소 3-5개 이상 찾기): 소비자 심리를 자극하는 요소
    - FOMO, 신뢰, 희망/기대, 욕망, 자아실현 등
+   - 이미지에서 사용된 모든 감정 자극 요소 분석
 
-5. **페인포인트 활용**: 소비자 고충점 활용 방식
+5. **페인포인트 활용** (최소 2-4개 이상 찾기): 소비자 고충점 활용 방식
 
-6. **활용 포인트**: 바로 적용할 수 있는 요소
-   - 복사 가능한 카피/문구
-   - 재현 가능한 디자인 요소
-   - 레이아웃 패턴
+6. **활용 포인트** (최소 5-8개 이상 찾기): 바로 적용할 수 있는 요소
+   - 복사 가능한 카피/문구 (최소 2개)
+   - 재현 가능한 디자인 요소 (최소 2개)
+   - 레이아웃 패턴 (최소 2개)
 
-7. **셀링 포인트**: 설득의 핵심 요소
+7. **셀링 포인트** (최소 3-5개 이상 찾기): 설득의 핵심 요소
    - 주장(claim)과 근거
    - 설득 기법: social_proof, scarcity, authority, before_after, comparison
+   - 이미지에서 사용된 모든 설득 요소 분석
 
 8. **CTA 분석**: 행동 유도 전략
 
@@ -629,22 +754,114 @@ JSON 형식으로만 응답하세요:
 
 10. **적용 권장사항**: 이 게시물의 성공 요소를 내 콘텐츠에 적용하는 방법 5개
 
+**중요 - 점수 피드백 형식**:
+모든 점수에 대해 반드시 **평가 기준별 세부 점수와 이유**를 제공하세요.
+
+**engagement_score (이미지 세그먼트용)**:
+"score_breakdown": {{
+  "visual_impact": {{"score": 0.85, "weight": "30%", "reason": "색상, 구도, 타이포그래피 평가"}},
+  "info_delivery": {{"score": 0.8, "weight": "25%", "reason": "메시지 명확성, 가독성 평가"}},
+  "emotional_appeal": {{"score": 0.85, "weight": "25%", "reason": "공감, 욕망 자극 정도"}},
+  "scroll_stopping": {{"score": 0.9, "weight": "20%", "reason": "첫 인상의 강렬함"}}
+}},
+"total_reason": "종합 평가 이유"
+
+**effectiveness_score (후킹 포인트용)**:
+"score_breakdown": {{
+  "attention_grab": {{"score": 0.9, "weight": "30%", "reason": "스크롤 멈춤 효과 평가"}},
+  "curiosity_trigger": {{"score": 0.85, "weight": "30%", "reason": "궁금증 유발 정도"}},
+  "memorability": {{"score": 0.8, "weight": "20%", "reason": "기억에 남는 정도"}},
+  "reusability": {{"score": 0.85, "weight": "20%", "reason": "다른 콘텐츠에 재활용 가능성"}}
+}},
+"total_reason": "종합 평가 이유"
+
+**impact_score (엣지 포인트용)**:
+"score_breakdown": {{
+  "uniqueness": {{"score": 0.9, "weight": "40%", "reason": "경쟁사 대비 독창성"}},
+  "brand_fit": {{"score": 0.8, "weight": "30%", "reason": "브랜드 아이덴티티 적합성"}},
+  "scalability": {{"score": 0.75, "weight": "30%", "reason": "다른 콘텐츠에 확장 적용 가능성"}}
+}},
+"total_reason": "종합 평가 이유"
+
+**intensity (감정 트리거용)**:
+"score_breakdown": {{
+  "emotional_depth": {{"score": 0.85, "weight": "40%", "reason": "감정 자극 깊이"}},
+  "trigger_clarity": {{"score": 0.9, "weight": "30%", "reason": "감정 트리거의 명확성"}},
+  "action_motivation": {{"score": 0.85, "weight": "30%", "reason": "행동 유도 연결성"}}
+}},
+"total_reason": "종합 평가 이유"
+
+**effectiveness (셀링 포인트용)**:
+"score_breakdown": {{
+  "claim_credibility": {{"score": 0.8, "weight": "35%", "reason": "주장의 신뢰성"}},
+  "evidence_strength": {{"score": 0.85, "weight": "35%", "reason": "근거의 설득력"}},
+  "conversion_potential": {{"score": 0.9, "weight": "30%", "reason": "구매 전환 가능성"}}
+}},
+"total_reason": "종합 평가 이유"
+
+**cta_analysis.effectiveness_score**:
+"score_breakdown": {{
+  "clarity": {{"score": 0.85, "weight": "30%", "reason": "CTA 메시지 명확성"}},
+  "urgency": {{"score": 0.7, "weight": "25%", "reason": "긴급성/희소성 요소"}},
+  "barrier_removal": {{"score": 0.8, "weight": "25%", "reason": "행동 장벽 제거 정도"}},
+  "visual_prominence": {{"score": 0.85, "weight": "20%", "reason": "시각적 눈에 띔 정도"}}
+}},
+"total_reason": "종합 평가 이유"
+
 JSON 형식으로만 응답하세요:
 ```json
 {{
-  "reference_name": "분석 결과를 바탕으로 이 콘텐츠의 핵심 내용을 설명하는 한국어 문장 (30자 이내, 예: '발리 해변에서 서핑하는 여행 브이로그', '신제품 화장품 사용 후기 리뷰 영상')",
+  "reference_name": "분석 결과를 바탕으로 이 콘텐츠의 핵심 내용을 설명하는 한국어 문장 (30자 이내)",
   "segments": [
-    {{"start_time": 0, "end_time": 1, "segment_type": "hook", "visual_description": "첫 번째 이미지 설명", "engagement_score": 0.9, "score_reasoning": "이 점수를 준 구체적 이유", "techniques": ["기법"]}},
-    {{"start_time": 1, "end_time": 2, "segment_type": "problem", "visual_description": "두 번째 이미지 설명", "engagement_score": 0.7, "score_reasoning": "이 점수를 준 구체적 이유", "techniques": ["기법"]}}
+    {{
+      "start_time": 0, "end_time": 1, "segment_type": "hook",
+      "visual_description": "첫 번째 이미지 설명", "engagement_score": 0.85,
+      "score_breakdown": {{
+        "visual_impact": {{"score": 0.9, "weight": "30%", "reason": "강렬한 색상 대비와 시선 유도 구도"}},
+        "info_delivery": {{"score": 0.8, "weight": "25%", "reason": "핵심 메시지가 한눈에 들어옴"}},
+        "emotional_appeal": {{"score": 0.85, "weight": "25%", "reason": "궁금증과 기대감 효과적 유발"}},
+        "scroll_stopping": {{"score": 0.9, "weight": "20%", "reason": "첫인상이 강렬하여 스크롤 멈춤"}}
+      }},
+      "total_reason": "시각적 임팩트와 정보 전달력이 균형있게 조화됨",
+      "techniques": ["기법"]
+    }}
   ],
   "hook_points": [
-    {{"timestamp": "이미지 1", "hook_type": "curiosity_gap", "effectiveness_score": 0.85, "score_reasoning": "이 효과성 점수를 준 구체적 이유", "description": "설명", "elements": ["요소"], "adaptable_template": "템플릿 문구"}}
+    {{
+      "timestamp": "이미지 1", "hook_type": "curiosity_gap", "effectiveness_score": 0.85,
+      "score_breakdown": {{
+        "attention_grab": {{"score": 0.9, "weight": "30%", "reason": "예상치 못한 비주얼로 즉시 주목"}},
+        "curiosity_trigger": {{"score": 0.85, "weight": "30%", "reason": "다음 슬라이드 보고 싶은 욕구 유발"}},
+        "memorability": {{"score": 0.8, "weight": "20%", "reason": "독특한 구도로 기억에 남음"}},
+        "reusability": {{"score": 0.85, "weight": "20%", "reason": "다양한 제품에 쉽게 적용 가능"}}
+      }},
+      "total_reason": "시각적 후킹이 스크롤 멈춤에 효과적으로 작용",
+      "description": "설명", "elements": ["요소"], "adaptable_template": "템플릿 문구"
+    }}
   ],
   "edge_points": [
-    {{"category": "visual", "description": "차별화 요소", "impact_score": 0.8, "score_reasoning": "이 임팩트 점수를 준 구체적 이유", "how_to_apply": "적용 방법"}}
+    {{
+      "category": "visual", "description": "차별화 요소", "impact_score": 0.8,
+      "score_breakdown": {{
+        "uniqueness": {{"score": 0.85, "weight": "40%", "reason": "경쟁사에서 볼 수 없는 색상 조합"}},
+        "brand_fit": {{"score": 0.8, "weight": "30%", "reason": "브랜드 톤앤매너와 일관성 유지"}},
+        "scalability": {{"score": 0.75, "weight": "30%", "reason": "다른 캠페인에도 적용 가능"}}
+      }},
+      "total_reason": "독창적인 비주얼이 브랜드 차별화에 기여",
+      "how_to_apply": "적용 방법"
+    }}
   ],
   "emotional_triggers": [
-    {{"timestamp": "이미지 2", "trigger_type": "FOMO", "intensity": 0.9, "score_reasoning": "이 강도 점수를 준 구체적 이유", "description": "감정 자극 방식"}}
+    {{
+      "timestamp": "이미지 2", "trigger_type": "FOMO", "intensity": 0.9,
+      "score_breakdown": {{
+        "emotional_depth": {{"score": 0.9, "weight": "40%", "reason": "한정판 강조로 긴박감 조성"}},
+        "trigger_clarity": {{"score": 0.85, "weight": "30%", "reason": "놓치면 후회라는 메시지 명확"}},
+        "action_motivation": {{"score": 0.9, "weight": "30%", "reason": "즉시 구매 행동으로 연결"}}
+      }},
+      "total_reason": "긴급성과 희소성이 강력한 FOMO 유발",
+      "description": "감정 자극 방식"
+    }}
   ],
   "pain_points": [
     {{"timestamp": "이미지 1-2", "pain_type": "explicit", "description": "페인포인트", "empathy_technique": "공감 기법"}}
@@ -655,7 +872,16 @@ JSON 형식으로만 응답하세요:
     {{"type": "layout_pattern", "content": "레이아웃", "context": "적용 방법"}}
   ],
   "selling_points": [
-    {{"timestamp": "이미지 3", "claim": "주장", "evidence_type": "testimonial", "persuasion_technique": "social_proof", "effectiveness": 0.85, "score_reasoning": "이 효과성 점수를 준 구체적 이유"}}
+    {{
+      "timestamp": "이미지 3", "claim": "주장", "evidence_type": "testimonial",
+      "persuasion_technique": "social_proof", "effectiveness": 0.85,
+      "score_breakdown": {{
+        "claim_credibility": {{"score": 0.8, "weight": "35%", "reason": "구체적 수치로 신뢰도 확보"}},
+        "evidence_strength": {{"score": 0.9, "weight": "35%", "reason": "실제 후기가 강력한 증거"}},
+        "conversion_potential": {{"score": 0.85, "weight": "30%", "reason": "구매 결정에 직접적 영향"}}
+      }},
+      "total_reason": "신뢰성 있는 후기가 설득력 있게 제시됨"
+    }}
   ],
   "cta_analysis": {{
     "cta_type": "direct/soft/implied",
@@ -663,7 +889,13 @@ JSON 형식으로만 응답하세요:
     "urgency_elements": [],
     "barrier_removal": [],
     "effectiveness_score": 0.8,
-    "score_reasoning": "이 CTA 효과성 점수를 준 구체적 이유"
+    "score_breakdown": {{
+      "clarity": {{"score": 0.85, "weight": "30%", "reason": "행동 지시가 명확함"}},
+      "urgency": {{"score": 0.7, "weight": "25%", "reason": "시간 제한 요소 효과적"}},
+      "barrier_removal": {{"score": 0.8, "weight": "25%", "reason": "무료 배송으로 장벽 낮춤"}},
+      "visual_prominence": {{"score": 0.85, "weight": "20%", "reason": "CTA 버튼이 눈에 띔"}}
+    }},
+    "total_reason": "명확한 행동 지시와 장벽 제거 전략이 효과적"
   }},
   "structure_pattern": {{
     "framework": "AIDA/PAS/Custom",
@@ -673,7 +905,13 @@ JSON 형식으로만 응답하세요:
   "transcript": "이미지 내 텍스트 전체",
   "recommendations": [
     {{"priority": 1, "action": "구체적 행동", "reason": "이유", "example": "예시"}}
-  ]
+  ],
+  "overall_evaluation": {{
+    "total_score": 0.8,
+    "one_line_review": "시각적 임팩트가 뛰어나나, 캐러셀 흐름 개선과 CTA 강화가 필요함",
+    "strengths": ["첫 이미지 스크롤 스토핑 효과 우수", "브랜드 컬러 일관성 유지"],
+    "weaknesses": ["후반부 슬라이드 집중도 저하", "구체적 혜택 설명 부족"]
+  }}
 }}
 ```"""
 
