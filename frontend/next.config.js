@@ -1,4 +1,7 @@
 /** @type {import('next').NextConfig} */
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 const nextConfig = {
   images: {
     remotePatterns: [
@@ -6,6 +9,11 @@ const nextConfig = {
         protocol: "http",
         hostname: "localhost",
         port: "8000",
+        pathname: "/static/**",
+      },
+      {
+        protocol: "https",
+        hostname: "**.railway.app",
         pathname: "/static/**",
       },
       {
@@ -22,20 +30,18 @@ const nextConfig = {
       },
     ],
   },
-  // Increase timeout for API routes (needed for long AI operations)
-  serverExternalPackages: [],
   experimental: {
-    proxyTimeout: 300000, // 5 minutes for image generation
+    proxyTimeout: 300000,
   },
   async rewrites() {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:8000/api/:path*",
+        destination: `${API_URL}/api/:path*`,
       },
       {
         source: "/static/:path*",
-        destination: "http://localhost:8000/static/:path*",
+        destination: `${API_URL}/static/:path*`,
       },
     ];
   },
