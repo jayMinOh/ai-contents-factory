@@ -543,20 +543,13 @@ class SNSMediaDownloader:
             # Detect platform
             platform = self._detect_platform(url)
 
-            # For Instagram, try Instaloader first (no login required for public posts)
-            if platform == 'instagram' and instaloader is not None:
-                shortcode = self._match_patterns(url, self.INSTAGRAM_PATTERNS)
-                if shortcode:
-                    try:
-                        logger.info(f"Using Instaloader for Instagram post: {shortcode}")
-                        images = await self._extract_instagram_images_instaloader(shortcode)
-                        if images:
-                            return images
-                    except Exception as e:
-                        logger.warning(f"Instaloader failed, falling back to gallery-dl: {e}")
+            # Use cookies file if available
+            effective_cookies = cookies_file or self.cookies_file
+            if effective_cookies:
+                logger.info(f"Using cookies file for {platform}: {effective_cookies}")
 
-            # Fallback to gallery-dl for other platforms or if Instaloader fails
-            result = await self.download(url, output_dir, cookies_file)
+            # Use gallery-dl directly (supports cookies.txt)
+            result = await self.download(url, output_dir, effective_cookies)
 
             if not result.get('success'):
                 raise SNSMediaDownloadError(f"Download failed for {url}")
