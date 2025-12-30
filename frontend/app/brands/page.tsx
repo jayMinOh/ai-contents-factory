@@ -478,6 +478,7 @@ function ProductCard({ product, brandId }: { product: Product; brandId: string }
                     fill
                     className="object-cover"
                     sizes="80px"
+                    unoptimized
                   />
                   <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center justify-center">
                     <Upload className="w-5 h-5 text-white" />
