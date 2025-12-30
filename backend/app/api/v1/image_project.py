@@ -1422,16 +1422,35 @@ async def download_image(
             detail=f"Project not found for image: {image_id}"
         )
 
-    # Resolve the image file path
+    # Resolve the image file path or URL
     image_url = gen_image.image_url
+    image_data = None
     image_path = None
 
-    if image_url.startswith("/static/"):
+    if image_url.startswith("http"):
+        # Download from COS or external URL
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.get(image_url)
+                if resp.status_code == 200:
+                    image_data = resp.content
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Failed to download image from URL: {image_url}"
+                    )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to download image: {str(e)}"
+            )
+    elif image_url.startswith("/static/"):
         image_path = os.path.join(settings.TEMP_DIR, image_url.replace("/static/", ""))
-    elif not image_url.startswith("http"):
+    else:
         image_path = image_url
 
-    if not image_path or not os.path.exists(image_path):
+    if image_path and not os.path.exists(image_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Image file not found: {image_url}"
@@ -1449,7 +1468,16 @@ async def download_image(
 
     # Open and process the image
     try:
-        with Image.open(image_path) as img:
+        # Open image from bytes (COS) or file path (local)
+        if image_data:
+            img = Image.open(io.BytesIO(image_data))
+            # Determine format from URL
+            ext = os.path.splitext(image_url)[1].lower() if '.' in image_url else '.jpg'
+        else:
+            img = Image.open(image_path)
+            ext = os.path.splitext(image_path)[1].lower()
+
+        with img:
             original_width, original_height = img.size
 
             # Calculate target dimensions maintaining aspect ratio
@@ -1469,9 +1497,6 @@ async def download_image(
                 new_height = int(original_width / target_ratio)
                 top = (original_height - new_height) // 2
                 processed_img = img.crop((0, top, original_width, top + new_height))
-
-            # Determine output format
-            ext = os.path.splitext(image_path)[1].lower()
             if ext in ['.jpg', '.jpeg']:
                 output_format = 'JPEG'
                 content_type = 'image/jpeg'

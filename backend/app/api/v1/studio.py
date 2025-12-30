@@ -1419,6 +1419,20 @@ async def edit_image_with_product(
                     logger.error(f"Failed to download image from URL: {e}")
                 return None, None
 
+            # Try to load from COS first (temp_id is UUID, file is in COS temp folder)
+            if cloud_storage.is_cloud_storage_enabled():
+                for ext in ["png", "jpg", "jpeg", "webp"]:
+                    cos_url = f"https://{settings.TENCENT_COS_BUCKET}.cos.{settings.TENCENT_COS_REGION}.myqcloud.com/temp/{temp_id_or_url}.{ext}"
+                    try:
+                        async with httpx.AsyncClient(timeout=30.0) as client:
+                            resp = await client.get(cos_url)
+                            if resp.status_code == 200:
+                                content_type = resp.headers.get("content-type", "image/jpeg")
+                                logger.info(f"Loaded image from COS: {cos_url}")
+                                return resp.content, content_type
+                    except Exception as e:
+                        continue
+
             # Fallback: try local file
             for ext in ["png", "jpg", "jpeg", "webp"]:
                 potential_path = os.path.join(temp_dir, f"{temp_id_or_url}.{ext}")

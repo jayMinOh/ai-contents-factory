@@ -20,6 +20,7 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { imageProjectApi, type ImageProject, type GeneratedImage } from "@/lib/api";
 import { toast } from "sonner";
@@ -83,6 +84,10 @@ const translations = {
       retryStarted: "이미지 생성이 다시 시작되었습니다",
       retryFailed: "다시 생성에 실패했습니다",
       generationStopped: "생성이 중단되었거나 오류가 발생했습니다",
+      deleteProject: "삭제",
+      deleteConfirm: "이 프로젝트를 삭제하시겠습니까?",
+      deleteSuccess: "프로젝트가 삭제되었습니다",
+      deleteFailed: "삭제에 실패했습니다",
     },
   },
   en: {
@@ -140,6 +145,10 @@ const translations = {
       retryStarted: "Image generation restarted",
       retryFailed: "Failed to retry generation",
       generationStopped: "Generation stopped or encountered an error",
+      deleteProject: "Delete",
+      deleteConfirm: "Are you sure you want to delete this project?",
+      deleteSuccess: "Project deleted",
+      deleteFailed: "Failed to delete project",
     },
   },
 };
@@ -229,6 +238,22 @@ export default function HistoryDetailPage() {
       toast.error(t.ui.retryFailed);
     } finally {
       setIsRetrying(false);
+    }
+  };
+
+  // Delete project
+  const handleDeleteProject = async () => {
+    if (!project) return;
+
+    if (!confirm(t.ui.deleteConfirm)) return;
+
+    try {
+      await imageProjectApi.delete(project.id);
+      toast.success(t.ui.deleteSuccess);
+      router.push("/history");
+    } catch (error) {
+      console.error("Delete failed:", error);
+      toast.error(t.ui.deleteFailed);
     }
   };
 
@@ -325,11 +350,25 @@ export default function HistoryDetailPage() {
                 )}
               </div>
               <button
-                onClick={() => refetch()}
-                className="p-2 hover:bg-muted rounded-lg transition-colors"
-                title={t.ui.refresh}
+                onClick={handleRetryGeneration}
+                disabled={isRetrying || project.status === "generating"}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
+                title={t.ui.retryGeneration}
               >
-                <RefreshCw className="w-5 h-5 text-muted" />
+                {isRetrying ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 text-muted" />
+                )}
+                <span className="text-sm text-muted">{t.ui.retryGeneration}</span>
+              </button>
+              <button
+                onClick={handleDeleteProject}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-red-500/10 rounded-lg transition-colors text-muted hover:text-red-500"
+                title={t.ui.deleteProject}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="text-sm">{t.ui.deleteProject}</span>
               </button>
             </div>
           </div>
