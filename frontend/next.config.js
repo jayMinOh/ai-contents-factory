@@ -28,6 +28,14 @@ const nextConfig = {
         protocol: "https",
         hostname: "i.ytimg.com",
       },
+      {
+        protocol: "https",
+        hostname: "**.cos.ap-seoul.myqcloud.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.myqcloud.com",
+      },
     ],
   },
   experimental: {
