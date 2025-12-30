@@ -24,7 +24,8 @@ class ReferenceAnalyzer:
 
     def __init__(self):
         genai.configure(api_key=settings.GOOGLE_API_KEY)
-        self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+        # 레퍼런스 분석은 안정적인 gemini-2.5-flash 사용 (프리뷰 모델은 할루시네이션 위험)
+        self.model = genai.GenerativeModel("gemini-2.5-flash")
         self.temp_dir = Path(settings.TEMP_DIR)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
 
