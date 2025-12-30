@@ -50,7 +50,7 @@ router = APIRouter(prefix="/image-projects", tags=["Image Projects"])
 
 # ========== CRUD Operations ==========
 
-@router.post("/", response_model=ImageProjectResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ImageProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_image_project(
     project_data: ImageProjectCreate,
     db: AsyncSession = Depends(get_db),
@@ -119,7 +119,7 @@ async def create_image_project(
     return project
 
 
-@router.get("/", response_model=List[ImageProjectSummary])
+@router.get("", response_model=List[ImageProjectSummary])
 async def list_image_projects(
     content_type: Optional[str] = None,
     status: Optional[str] = None,

@@ -322,7 +322,7 @@ async def get_analysis(analysis_id: str, db: AsyncSession = Depends(get_db)):
     return model_to_result(analysis)
 
 
-@router.get("/", response_model=List[AnalysisResult])
+@router.get("", response_model=List[AnalysisResult])
 async def list_analyses(
     status: Optional[AnalysisStatus] = None,
     tag: Optional[str] = None,
