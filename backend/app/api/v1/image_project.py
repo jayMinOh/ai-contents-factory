@@ -49,6 +49,64 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/image-projects", tags=["Image Projects"])
 
 
+# ========== Helper Functions ==========
+
+async def load_image_from_url(image_url: str, settings) -> tuple[bytes, str] | tuple[None, None]:
+    """
+    Load image from various URL formats (local, localhost, cloud).
+    Returns (image_bytes, mime_type) or (None, None) if failed.
+    """
+    import os
+    import httpx
+
+    if not image_url:
+        return None, None
+
+    image_data = None
+    mime_type = "image/png" if ".png" in image_url.lower() else "image/jpeg"
+
+    try:
+        # 1. localhost URL → local path
+        if image_url.startswith("http://localhost:8000/static/"):
+            relative_path = image_url.replace("http://localhost:8000/static/", "")
+            image_path = os.path.join(settings.TEMP_DIR, relative_path)
+            if os.path.exists(image_path):
+                with open(image_path, "rb") as f:
+                    image_data = f.read()
+                logger.info(f"Loaded image from localhost path: {image_path} ({len(image_data)} bytes)")
+
+        # 2. Relative static URL → local path
+        elif image_url.startswith("/static/"):
+            image_path = os.path.join(settings.TEMP_DIR, image_url.replace("/static/", ""))
+            if os.path.exists(image_path):
+                with open(image_path, "rb") as f:
+                    image_data = f.read()
+                logger.info(f"Loaded image from static path: {image_path} ({len(image_data)} bytes)")
+
+        # 3. Cloud/External URL → download
+        elif image_url.startswith("http"):
+            logger.info(f"Downloading image from cloud: {image_url}")
+            async with httpx.AsyncClient() as client:
+                response = await client.get(image_url, timeout=30.0)
+                if response.status_code == 200:
+                    image_data = response.content
+                    logger.info(f"Downloaded image: {len(image_data)} bytes")
+                else:
+                    logger.warning(f"Failed to download image: HTTP {response.status_code}")
+
+        # 4. Direct file path
+        else:
+            if os.path.exists(image_url):
+                with open(image_url, "rb") as f:
+                    image_data = f.read()
+                logger.info(f"Loaded image from path: {image_url} ({len(image_data)} bytes)")
+
+    except Exception as e:
+        logger.error(f"Error loading image from {image_url}: {e}")
+
+    return image_data, mime_type if image_data else (None, None)
+
+
 # ========== CRUD Operations ==========
 
 @router.post("", response_model=ImageProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -277,33 +335,8 @@ async def generate_images(
         product = product_result.scalar_one_or_none()
 
         if product and product.image_url:
-            # Load product image
-            image_url = product.image_url
-            image_path = None
-
-            # Handle various URL formats
-            if image_url.startswith("http://localhost:8000/static/"):
-                # Convert localhost URL to local path: http://localhost:8000/static/products/xxx.png -> storage/products/xxx.png
-                relative_path = image_url.replace("http://localhost:8000/static/", "")
-                image_path = os.path.join(settings.TEMP_DIR, relative_path)
-                logger.info(f"Converted localhost URL to path: {image_url} -> {image_path}")
-            elif image_url.startswith("/static/"):
-                # Handle relative static URLs: /static/products/xxx.png -> storage/products/xxx.png
-                image_path = os.path.join(settings.TEMP_DIR, image_url.replace("/static/", ""))
-            elif image_url.startswith("http"):
-                # For external remote URLs, skip for now
-                logger.warning(f"External URL not supported: {image_url}")
-                image_path = None
-            else:
-                # Direct file path
-                image_path = image_url
-
-            if image_path and os.path.exists(image_path):
-                with open(image_path, "rb") as f:
-                    product_image_data = f.read()
-                logger.info(f"Loaded product image: {len(product_image_data)} bytes from {image_path}")
-            elif image_path:
-                logger.warning(f"Product image file not found: {image_path}")
+            # Load product image using helper function
+            product_image_data, _ = await load_image_from_url(product.image_url, settings)
 
     # Update project status
     project.status = "generating"
@@ -556,21 +589,8 @@ async def generate_section(
         ref_image = ref_result.scalar_one_or_none()
 
         if ref_image and ref_image.image_url:
-            # Load the reference image data
-            image_url = ref_image.image_url
-            image_path = None
-
-            if image_url.startswith("/static/"):
-                image_path = os.path.join(settings.TEMP_DIR, image_url.replace("/static/", ""))
-            elif not image_url.startswith("http"):
-                image_path = image_url
-
-            if image_path and os.path.exists(image_path):
-                with open(image_path, "rb") as f:
-                    reference_image_data = f.read()
-                reference_mime_type = "image/png" if ".png" in image_path.lower() else "image/jpeg"
-                reference_used = True
-                logger.info(f"Loaded reference image: {len(reference_image_data)} bytes from {image_path}")
+            reference_image_data, reference_mime_type = await load_image_from_url(ref_image.image_url, settings)
+            reference_used = reference_image_data is not None
 
     # Load product image if available
     product = None
@@ -582,22 +602,7 @@ async def generate_section(
         product = product_result.scalar_one_or_none()
 
         if product and product.image_url:
-            image_url = product.image_url
-            image_path = None
-
-            if image_url.startswith("http://localhost:8000/static/"):
-                relative_path = image_url.replace("http://localhost:8000/static/", "")
-                image_path = os.path.join(settings.TEMP_DIR, relative_path)
-            elif image_url.startswith("/static/"):
-                image_path = os.path.join(settings.TEMP_DIR, image_url.replace("/static/", ""))
-            elif not image_url.startswith("http"):
-                image_path = image_url
-
-            if image_path and os.path.exists(image_path):
-                with open(image_path, "rb") as f:
-                    product_image_data = f.read()
-                product_mime_type = "image/png" if ".png" in image_path.lower() else "image/jpeg"
-                logger.info(f"Loaded product image: {len(product_image_data)} bytes")
+            product_image_data, product_mime_type = await load_image_from_url(product.image_url, settings)
 
     # Update project status
     project.status = "generating"
@@ -896,20 +901,8 @@ async def regenerate_section(
         ref_image = ref_result.scalar_one_or_none()
 
         if ref_image and ref_image.image_url:
-            image_url = ref_image.image_url
-            image_path = None
-
-            if image_url.startswith("/static/"):
-                image_path = os.path.join(settings.TEMP_DIR, image_url.replace("/static/", ""))
-            elif not image_url.startswith("http"):
-                image_path = image_url
-
-            if image_path and os.path.exists(image_path):
-                with open(image_path, "rb") as f:
-                    reference_image_data = f.read()
-                reference_mime_type = "image/png" if ".png" in image_path.lower() else "image/jpeg"
-                reference_used = True
-                logger.info(f"Loaded reference image for regeneration: {len(reference_image_data)} bytes")
+            reference_image_data, reference_mime_type = await load_image_from_url(ref_image.image_url, settings)
+            reference_used = reference_image_data is not None
 
     # Load product image if available
     product = None
@@ -921,21 +914,7 @@ async def regenerate_section(
         product = product_result.scalar_one_or_none()
 
         if product and product.image_url:
-            image_url = product.image_url
-            image_path = None
-
-            if image_url.startswith("http://localhost:8000/static/"):
-                relative_path = image_url.replace("http://localhost:8000/static/", "")
-                image_path = os.path.join(settings.TEMP_DIR, relative_path)
-            elif image_url.startswith("/static/"):
-                image_path = os.path.join(settings.TEMP_DIR, image_url.replace("/static/", ""))
-            elif not image_url.startswith("http"):
-                image_path = image_url
-
-            if image_path and os.path.exists(image_path):
-                with open(image_path, "rb") as f:
-                    product_image_data = f.read()
-                product_mime_type = "image/png" if ".png" in image_path.lower() else "image/jpeg"
+            product_image_data, product_mime_type = await load_image_from_url(product.image_url, settings)
 
     # Update project status
     project.status = "generating"
@@ -1131,59 +1110,15 @@ async def run_background_image_generation(project_id: str):
                 product = product_result.scalar_one_or_none()
 
                 if product and product.image_url:
-                    image_url = product.image_url
-                    image_path = None
-                    logger.info(f"Product image URL: {image_url}")
-
-                    if image_url.startswith("http://localhost:8000/static/"):
-                        relative_path = image_url.replace("http://localhost:8000/static/", "")
-                        image_path = os.path.join(settings.TEMP_DIR, relative_path)
-                    elif image_url.startswith("/static/"):
-                        image_path = os.path.join(settings.TEMP_DIR, image_url.replace("/static/", ""))
-                    elif image_url.startswith("http"):
-                        # 외부 URL (클라우드 스토리지)에서 이미지 다운로드
-                        try:
-                            import httpx
-                            logger.info(f"Downloading product image from cloud: {image_url}")
-                            async with httpx.AsyncClient() as client:
-                                response = await client.get(image_url, timeout=30.0)
-                                if response.status_code == 200:
-                                    product_image_data = response.content
-                                    product_mime_type = "image/png" if ".png" in image_url.lower() else "image/jpeg"
-                                    logger.info(f"Downloaded product image: {len(product_image_data)} bytes")
-                                else:
-                                    logger.warning(f"Failed to download product image: HTTP {response.status_code}")
-                        except Exception as e:
-                            logger.error(f"Error downloading product image: {e}")
-                    else:
-                        image_path = image_url
-
-                    # 로컬 파일에서 로드 (아직 로드 안 됐으면)
-                    if not product_image_data and image_path and os.path.exists(image_path):
-                        with open(image_path, "rb") as f:
-                            product_image_data = f.read()
-                        product_mime_type = "image/png" if ".png" in image_path.lower() else "image/jpeg"
-                        logger.info(f"Loaded product image from local: {len(product_image_data)} bytes")
+                    product_image_data, product_mime_type = await load_image_from_url(product.image_url, settings)
 
             # Load reference images if available (for style guidance)
             reference_images_data = []
             if project.reference_image_urls:
                 for ref_url in project.reference_image_urls:
-                    try:
-                        # Convert URL to file path
-                        if ref_url.startswith("/static/"):
-                            ref_path = os.path.join(settings.TEMP_DIR, ref_url.replace("/static/", ""))
-                        else:
-                            ref_path = ref_url
-
-                        if os.path.exists(ref_path):
-                            with open(ref_path, "rb") as f:
-                                ref_data = f.read()
-                            ref_mime = "image/png" if ".png" in ref_path.lower() else "image/jpeg"
-                            reference_images_data.append((ref_data, ref_mime))
-                            logger.info(f"Loaded reference image: {ref_path} ({len(ref_data)} bytes)")
-                    except Exception as e:
-                        logger.error(f"Failed to load reference image {ref_url}: {e}")
+                    ref_data, ref_mime = await load_image_from_url(ref_url, settings)
+                    if ref_data:
+                        reference_images_data.append((ref_data, ref_mime))
 
                 logger.info(f"Total reference images loaded: {len(reference_images_data)}")
 
