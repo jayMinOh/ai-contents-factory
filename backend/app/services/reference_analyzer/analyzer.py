@@ -556,11 +556,17 @@ JSON 형식으로만 응답하세요:
 }}
 ```"""
 
-        # Gemini API 호출 (이미지 + 텍스트)
-        response = await asyncio.to_thread(
-            self.model.generate_content,
-            [prompt] + images
-        )
+        # Gemini API 호출 (이미지 + 텍스트) - 10분 타임아웃
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.model.generate_content,
+                    [prompt] + images
+                ),
+                timeout=600  # 10분
+            )
+        except asyncio.TimeoutError:
+            raise Exception("Gemini 분석 시간 초과 (10분). 영상이 너무 복잡하거나 서버가 바쁩니다.")
 
         result_text = response.text
 
