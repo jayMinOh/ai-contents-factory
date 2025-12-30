@@ -1133,20 +1133,37 @@ async def run_background_image_generation(project_id: str):
                 if product and product.image_url:
                     image_url = product.image_url
                     image_path = None
+                    logger.info(f"Product image URL: {image_url}")
 
                     if image_url.startswith("http://localhost:8000/static/"):
                         relative_path = image_url.replace("http://localhost:8000/static/", "")
                         image_path = os.path.join(settings.TEMP_DIR, relative_path)
                     elif image_url.startswith("/static/"):
                         image_path = os.path.join(settings.TEMP_DIR, image_url.replace("/static/", ""))
-                    elif not image_url.startswith("http"):
+                    elif image_url.startswith("http"):
+                        # 외부 URL (클라우드 스토리지)에서 이미지 다운로드
+                        try:
+                            import httpx
+                            logger.info(f"Downloading product image from cloud: {image_url}")
+                            async with httpx.AsyncClient() as client:
+                                response = await client.get(image_url, timeout=30.0)
+                                if response.status_code == 200:
+                                    product_image_data = response.content
+                                    product_mime_type = "image/png" if ".png" in image_url.lower() else "image/jpeg"
+                                    logger.info(f"Downloaded product image: {len(product_image_data)} bytes")
+                                else:
+                                    logger.warning(f"Failed to download product image: HTTP {response.status_code}")
+                        except Exception as e:
+                            logger.error(f"Error downloading product image: {e}")
+                    else:
                         image_path = image_url
 
-                    if image_path and os.path.exists(image_path):
+                    # 로컬 파일에서 로드 (아직 로드 안 됐으면)
+                    if not product_image_data and image_path and os.path.exists(image_path):
                         with open(image_path, "rb") as f:
                             product_image_data = f.read()
                         product_mime_type = "image/png" if ".png" in image_path.lower() else "image/jpeg"
-                        logger.info(f"Loaded product image: {len(product_image_data)} bytes")
+                        logger.info(f"Loaded product image from local: {len(product_image_data)} bytes")
 
             # Load reference images if available (for style guidance)
             reference_images_data = []

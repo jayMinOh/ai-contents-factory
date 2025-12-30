@@ -91,12 +91,24 @@ class GeminiImageEditor:
             pil_image = Image.open(io.BytesIO(product_image_data))
             contents.append(pil_image)
 
+        # 시스템 지시: 프롬프트를 정확히 따르도록 강조
+        system_instruction = """You are a precise image generator. You MUST follow the user's prompt EXACTLY.
+CRITICAL RULES:
+1. Generate EXACTLY what the user describes - no substitutions
+2. If the prompt says "skincare bottle", generate a skincare bottle, NOT coffee or other items
+3. If the prompt mentions a specific product, that exact product must appear in the image
+4. Do not add random objects that are not mentioned in the prompt
+5. Follow the scene description precisely
+6. When reference images are provided, match their STYLE but create the NEW scene described in the prompt"""
+
         def _generate():
             return self.client.models.generate_content(
                 model=self.model_name,
                 contents=contents,
                 config=types.GenerateContentConfig(
                     response_modalities=["IMAGE"],
+                    temperature=0.4,  # 낮은 temperature로 프롬프트에 더 충실하게
+                    system_instruction=system_instruction,
                     image_config=types.ImageConfig(
                         aspect_ratio=aspect_ratio,
                     ),
