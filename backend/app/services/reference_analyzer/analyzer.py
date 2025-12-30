@@ -139,8 +139,11 @@ class ReferenceAnalyzer:
             "-o", str(output_path),
             "--no-playlist",
             "--no-check-certificates",
+            "--verbose",  # 디버깅용 상세 로그
             url,
         ]
+
+        print(f"yt-dlp 명령: {' '.join(cmd)}")
 
         # Add cookies if available
         cookies_file = os.environ.get("YOUTUBE_COOKIES_FILE", "/app/config/youtube_cookies.txt")
@@ -155,6 +158,14 @@ class ReferenceAnalyzer:
         )
 
         stdout, stderr = await process.communicate()
+
+        # yt-dlp 출력 로깅 (포맷 선택 확인용)
+        if stderr:
+            stderr_text = stderr.decode()
+            # 포맷 관련 로그만 출력
+            for line in stderr_text.split('\n'):
+                if any(keyword in line.lower() for keyword in ['format', 'downloading', 'requested', 'available', 'chosen']):
+                    print(f"yt-dlp: {line}")
 
         if process.returncode != 0:
             error_text = stderr.decode()
