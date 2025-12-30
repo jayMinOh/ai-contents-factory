@@ -450,7 +450,7 @@ export default function HistoryDetailPage() {
                       >
                         {hasImages ? (
                           <img
-                            src={`http://localhost:8000${slideImages[0].image_url}`}
+                            src={slideImages[0].image_url.startsWith('http') ? slideImages[0].image_url : `http://localhost:8000${slideImages[0].image_url}`}
                             alt={`${t.ui.slide} ${slide.slide_number}`}
                             className="w-full h-full object-cover"
                           />
@@ -533,7 +533,7 @@ export default function HistoryDetailPage() {
                       className="group relative aspect-square rounded-xl overflow-hidden border border-default"
                     >
                       <img
-                        src={`http://localhost:8000${image.image_url}`}
+                        src={image.image_url.startsWith('http') ? image.image_url : `http://localhost:8000${image.image_url}`}
                         alt={`Generated ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
@@ -548,7 +548,7 @@ export default function HistoryDetailPage() {
                           <Download className="w-5 h-5 text-white" />
                         </button>
                         <a
-                          href={`http://localhost:8000${image.image_url}`}
+                          href={image.image_url.startsWith('http') ? image.image_url : `http://localhost:8000${image.image_url}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
@@ -586,7 +586,7 @@ export default function HistoryDetailPage() {
                       className="group relative aspect-square rounded-xl overflow-hidden border border-default"
                     >
                       <img
-                        src={`http://localhost:8000${image.image_url}`}
+                        src={image.image_url.startsWith('http') ? image.image_url : `http://localhost:8000${image.image_url}`}
                         alt={`Generated ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
