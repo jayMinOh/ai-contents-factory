@@ -148,7 +148,16 @@ class ReferenceAnalyzer:
         stdout, stderr = await process.communicate()
 
         if process.returncode != 0:
-            raise Exception(f"영상 다운로드 실패: {stderr.decode()}")
+            error_text = stderr.decode()
+            # Convert technical errors to user-friendly messages
+            if "Sign in to confirm you're not a bot" in error_text:
+                raise Exception("YouTube에서 봇으로 감지되어 다운로드할 수 없습니다. 직접 영상을 다운로드하여 업로드해주세요.")
+            elif "Video unavailable" in error_text or "Private video" in error_text:
+                raise Exception("영상이 비공개이거나 삭제되었습니다.")
+            elif "age-restricted" in error_text.lower():
+                raise Exception("연령 제한 영상은 다운로드할 수 없습니다.")
+            else:
+                raise Exception(f"영상 다운로드 실패. 직접 영상을 다운로드하여 업로드해주세요.")
 
         # yt-dlp가 확장자를 바꿀 수 있으므로 실제 파일 찾기
         if not output_path.exists():
