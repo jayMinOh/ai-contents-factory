@@ -7,7 +7,14 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     libpq-dev \
     gcc \
+    curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install deno for yt-dlp YouTube extraction
+RUN curl -fsSL https://deno.land/install.sh | sh
+ENV DENO_INSTALL="/root/.deno"
+ENV PATH="$DENO_INSTALL/bin:$PATH"
 
 # Copy requirements first for better caching
 COPY requirements.txt .
