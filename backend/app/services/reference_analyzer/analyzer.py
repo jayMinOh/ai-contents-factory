@@ -562,16 +562,20 @@ JSON 형식으로만 응답하세요:
 
         # Gemini API 호출 (이미지 + 텍스트) - 10분 타임아웃
         import time
+        from google.generativeai.types import RequestOptions
+
         start_time = time.time()
         print(f"[Gemini] API 호출 시작 - 이미지 {len(images)}개, 타임아웃 600초")
 
         try:
+            # Gemini SDK 내부 타임아웃을 600초로 설정
             response = await asyncio.wait_for(
                 asyncio.to_thread(
                     self.model.generate_content,
-                    [prompt] + images
+                    [prompt] + images,
+                    request_options=RequestOptions(timeout=600)
                 ),
-                timeout=600  # 10분
+                timeout=660  # 외부 타임아웃은 내부보다 조금 더 길게
             )
             elapsed = time.time() - start_time
             print(f"[Gemini] API 호출 완료 - 소요시간: {elapsed:.1f}초")
