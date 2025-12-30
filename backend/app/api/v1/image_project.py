@@ -1193,7 +1193,11 @@ async def run_background_image_generation(project_id: str):
                     or project.prompt
                     or ""
                 )
-                logger.info(f"Generating slide {slide_number}/{total_slides}: {slide_prompt[:50]}...")
+                # 상세 로그: 어떤 프롬프트가 사용되는지 확인
+                logger.info(f"=== Slide {slide_number}/{total_slides} ===")
+                logger.info(f"[원본] visual_prompt: {slide_data.get('visual_prompt', 'NONE')[:100] if slide_data.get('visual_prompt') else 'NONE'}")
+                logger.info(f"[원본] visual_prompt_display: {slide_data.get('visual_prompt_display', 'NONE')[:100] if slide_data.get('visual_prompt_display') else 'NONE'}")
+                logger.info(f"[사용] slide_prompt: {slide_prompt[:100] if slide_prompt else 'EMPTY'}")
 
                 # Build prompt with product info
                 prompt = slide_prompt
@@ -1213,6 +1217,7 @@ async def run_background_image_generation(project_id: str):
                 # Optimize prompt
                 optimizer = get_prompt_optimizer()
                 optimized_prompt = await optimizer.optimize(prompt)
+                logger.info(f"[최적화] optimized_prompt: {optimized_prompt[:150] if optimized_prompt else 'EMPTY'}")
 
                 # Generate 2 variants per slide
                 num_variants = 2
