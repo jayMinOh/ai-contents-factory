@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.services.cloud_storage import cloud_storage
 from app.schemas.brand import (
     BrandCreate,
     BrandResponse,
@@ -268,20 +269,12 @@ async def upload_product_image(
     # Read file content
     image_data = await file.read()
 
-    # Save image to static directory
-    products_dir = os.path.join(settings.TEMP_DIR, "products")
-    os.makedirs(products_dir, exist_ok=True)
-
+    # Upload to cloud storage
     ext = file.filename.split(".")[-1] if file.filename else "png"
     filename = f"{product_id}.{ext}"
-    filepath = os.path.join(products_dir, filename)
-
-    with open(filepath, "wb") as f:
-        f.write(image_data)
-
-    # Use relative path - frontend will prepend backend URL
-    image_url = f"/static/products/{filename}"
-    logger.info(f"Product image saved: {filepath}")
+    content_type = file.content_type or "image/jpeg"
+    image_url = cloud_storage.upload_bytes(image_data, filename, "products", content_type)
+    logger.info(f"Product image uploaded: {filename}, url: {image_url}")
 
     # Analyze image with Gemini Vision
     try:

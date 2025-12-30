@@ -33,6 +33,9 @@ gallery-dl>=1.27.0
 # Image Processing
 Pillow==10.2.0
 
+# Cloud Storage
+cos-python-sdk-v5>=1.9.30
+
 # Utilities
 pydantic==2.5.3
 email-validator>=2.0.0

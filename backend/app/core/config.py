@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     TEMP_DIR: str = "storage"
     UPLOAD_DIR: str = "uploads"
 
+    # Tencent COS
+    TENCENT_SECRET_ID: Optional[str] = None
+    TENCENT_SECRET_KEY: Optional[str] = None
+    TENCENT_COS_BUCKET: Optional[str] = None
+    TENCENT_COS_REGION: Optional[str] = None
+
     class Config:
         env_file = ".env"
         case_sensitive = True

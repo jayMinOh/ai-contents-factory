@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.services.cloud_storage import cloud_storage
 from app.models import Brand, Product, ReferenceAnalysis, SceneImage, VideoProject, Storyboard
 from app.models.scene_video import SceneVideo
 from app.services.video_generator import get_video_generator, SceneInput, SceneVideoResult
@@ -219,20 +220,14 @@ async def upload_temp_image(
     if len(content) > 50 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File size exceeds 50MB limit")
 
-    # Save to temp directory
+    # Upload to cloud storage
     temp_id = str(uuid.uuid4())
     ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
     filename = f"{temp_id}.{ext}"
+    content_type = file.content_type or "image/jpeg"
 
-    temp_dir = os.path.join(settings.TEMP_DIR, "temp")
-    os.makedirs(temp_dir, exist_ok=True)
-
-    filepath = os.path.join(temp_dir, filename)
-    with open(filepath, "wb") as f:
-        f.write(content)
-
-    preview_url = f"http://localhost:8000/static/temp/{filename}"
-    logger.info(f"Temp image saved: {filepath}")
+    preview_url = cloud_storage.upload_bytes(content, filename, "temp", content_type)
+    logger.info(f"Temp image uploaded: {filename}, url: {preview_url}")
 
     return {
         "temp_id": temp_id,
@@ -499,17 +494,10 @@ Place the product naturally in the scene according to the description."""
     if image_data:
         ext = "png" if "png" in mime_type else "jpg"
         filename = f"{temp_id}.{ext}"
-
-        temp_dir = os.path.join(settings.TEMP_DIR, "temp")
-        os.makedirs(temp_dir, exist_ok=True)
-
-        filepath = os.path.join(temp_dir, filename)
         image_bytes = base64.b64decode(image_data)
-        with open(filepath, "wb") as f:
-            f.write(image_bytes)
-
-        preview_url = f"http://localhost:8000/static/temp/{filename}"
-        logger.info(f"Generated image saved to temp: {filepath}")
+        content_type = "image/png" if ext == "png" else "image/jpeg"
+        preview_url = cloud_storage.upload_bytes(image_bytes, filename, "temp", content_type)
+        logger.info(f"Generated image uploaded: {filename}, url: {preview_url}")
     else:
         # For mock provider with URL
         filename = f"{temp_id}.jpg"
@@ -1231,25 +1219,30 @@ async def analyze_marketing_image(
     temp_id = str(uuid.uuid4())
     ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
     filename = f"{temp_id}.{ext}"
+    content_type = file.content_type or "image/jpeg"
 
-    temp_dir = os.path.join(settings.TEMP_DIR, "temp")
-    os.makedirs(temp_dir, exist_ok=True)
+    # Upload to cloud storage
+    preview_url = cloud_storage.upload_bytes(content, filename, "temp", content_type)
+    logger.info(f"Marketing image uploaded: {filename}, url: {preview_url}")
 
-    filepath = os.path.join(temp_dir, filename)
-    with open(filepath, "wb") as f:
-        f.write(content)
-
-    logger.info(f"Marketing image saved for analysis: {filepath}")
+    # Save temp file for analysis (will be cleaned up by OS)
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
 
     try:
         # Analyze with Gemini Vision
         analyzer = MarketingImageAnalyzer()
-        analysis_result = await analyzer.analyze(filepath, language=language)
+        analysis_result = await analyzer.analyze(tmp_path, language=language)
+
+        # Clean up temp file
+        os.unlink(tmp_path)
 
         return {
             "temp_id": temp_id,
             "filename": filename,
-            "preview_url": f"http://localhost:8000/static/temp/{filename}",
+            "preview_url": preview_url,
             "description": analysis_result.get("description", ""),
             "detected_type": analysis_result.get("detected_type", "unknown"),
             "is_realistic": analysis_result.get("is_realistic", True),
@@ -1258,11 +1251,16 @@ async def analyze_marketing_image(
         }
     except Exception as e:
         logger.error(f"Image analysis failed: {str(e)}")
+        # Clean up temp file
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
         # Return basic response even if analysis fails
         return {
             "temp_id": temp_id,
             "filename": filename,
-            "preview_url": f"http://localhost:8000/static/temp/{filename}",
+            "preview_url": preview_url,
             "description": "이미지 분석을 수행할 수 없습니다.",
             "detected_type": "unknown",
             "is_realistic": True,  # Default to True for safety
@@ -1350,7 +1348,7 @@ Create a professional marketing image. If a product is specified, ensure the pro
             aspect_ratio=aspect_ratio or "1:1",
         )
 
-        # Save generated image to temp directory
+        # Upload generated image to cloud storage
         temp_id = str(uuid.uuid4())
         image_data = gen_result.get("image_data")
         mime_type = gen_result.get("mime_type", "image/png")
@@ -1358,17 +1356,10 @@ Create a professional marketing image. If a product is specified, ensure the pro
         if image_data:
             ext = "png" if "png" in mime_type else "jpg"
             filename = f"{temp_id}.{ext}"
-
-            temp_dir = os.path.join(settings.TEMP_DIR, "temp")
-            os.makedirs(temp_dir, exist_ok=True)
-
-            filepath = os.path.join(temp_dir, filename)
             image_bytes = base64.b64decode(image_data)
-            with open(filepath, "wb") as f:
-                f.write(image_bytes)
-
-            image_url = f"http://localhost:8000/static/temp/{filename}"
-            logger.info(f"Marketing image generated: {filepath}")
+            content_type = "image/png" if ext == "png" else "image/jpeg"
+            image_url = cloud_storage.upload_bytes(image_bytes, filename, "generated", content_type)
+            logger.info(f"Marketing image uploaded: {filename}, url: {image_url}")
         else:
             # For mock provider
             image_url = gen_result.get("image_url", "")
@@ -1408,6 +1399,7 @@ async def edit_image_with_product(
     """
     from app.services.image_editor import get_image_editor
     import os
+    import httpx
     from app.core.config import settings
 
     logger.info(f"=== edit_image_with_product called ===")
@@ -1418,10 +1410,23 @@ async def edit_image_with_product(
     try:
         temp_dir = os.path.join(settings.TEMP_DIR, "temp")
 
-        # Helper function to find and load image by temp_id
-        def find_and_load_image(temp_id: str) -> tuple:
+        # Helper function to find and load image by temp_id or URL
+        async def find_and_load_image(temp_id_or_url: str) -> tuple:
+            # Check if it's a cloud URL
+            if temp_id_or_url.startswith("http"):
+                try:
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        resp = await client.get(temp_id_or_url)
+                        if resp.status_code == 200:
+                            content_type = resp.headers.get("content-type", "image/jpeg")
+                            return resp.content, content_type
+                except Exception as e:
+                    logger.error(f"Failed to download image from URL: {e}")
+                return None, None
+
+            # Fallback: try local file
             for ext in ["png", "jpg", "jpeg", "webp"]:
-                potential_path = os.path.join(temp_dir, f"{temp_id}.{ext}")
+                potential_path = os.path.join(temp_dir, f"{temp_id_or_url}.{ext}")
                 if os.path.exists(potential_path):
                     mime_type = f"image/{'jpeg' if ext in ['jpg', 'jpeg'] else ext}"
                     with open(potential_path, "rb") as f:
@@ -1433,16 +1438,16 @@ async def edit_image_with_product(
         # New approach: load all images from image_temp_ids
         if request.image_temp_ids:
             for temp_id in request.image_temp_ids:
-                img_data, mime_type = find_and_load_image(temp_id)
+                img_data, mime_type = await find_and_load_image(temp_id)
                 if img_data:
                     images_data.append((img_data, mime_type))
-                    logger.info(f"Loaded image {temp_id}: {len(img_data)} bytes, {mime_type}")
+                    logger.info(f"Loaded image {temp_id[:50]}...: {len(img_data)} bytes, {mime_type}")
                 else:
                     logger.warning(f"Image not found: {temp_id}")
 
         # Legacy fallback: single product_image_temp_id
         elif request.product_image_temp_id:
-            img_data, mime_type = find_and_load_image(request.product_image_temp_id)
+            img_data, mime_type = await find_and_load_image(request.product_image_temp_id)
             if img_data:
                 images_data.append((img_data, mime_type))
                 logger.info(f"Loaded legacy image: {len(img_data)} bytes, {mime_type}")
@@ -1463,20 +1468,17 @@ async def edit_image_with_product(
             images_data=images_data,
         )
 
-        # Save generated image to temp directory
+        # Upload generated image to cloud storage
         temp_id = str(uuid.uuid4())
         mime_type = result.get("mime_type", "image/png")
         ext = "png" if "png" in mime_type else "jpg"
         filename = f"{temp_id}.{ext}"
 
-        filepath = os.path.join(temp_dir, filename)
         import base64
         image_bytes = base64.b64decode(result["image_data"])
-        with open(filepath, "wb") as f:
-            f.write(image_bytes)
-
-        image_url = f"http://localhost:8000/static/temp/{filename}"
-        logger.info(f"Edited image saved: {filepath}")
+        content_type = "image/png" if ext == "png" else "image/jpeg"
+        image_url = cloud_storage.upload_bytes(image_bytes, filename, "generated", content_type)
+        logger.info(f"Edited image uploaded: {filename}, url: {image_url}")
 
         response_data = {
             "image_id": temp_id,
@@ -1513,6 +1515,7 @@ async def compose_scene_with_product(
     """
     from app.services.image_editor import get_image_editor
     import os
+    import httpx
     from app.core.config import settings
 
     logger.info(f"=== compose_scene_with_product called ===")
@@ -1523,34 +1526,39 @@ async def compose_scene_with_product(
     try:
         temp_dir = os.path.join(settings.TEMP_DIR, "temp")
 
-        # Find product image
-        product_image_path = None
-        product_mime_type = None
-        for ext in ["png", "jpg", "jpeg", "webp"]:
-            potential_path = os.path.join(temp_dir, f"{request.product_image_temp_id}.{ext}")
-            if os.path.exists(potential_path):
-                product_image_path = potential_path
-                product_mime_type = f"image/{'jpeg' if ext in ['jpg', 'jpeg'] else ext}"
-                break
+        # Helper function to load image by temp_id or URL
+        async def load_image(temp_id_or_url: str) -> tuple:
+            # Check if it's a cloud URL
+            if temp_id_or_url.startswith("http"):
+                try:
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        resp = await client.get(temp_id_or_url)
+                        if resp.status_code == 200:
+                            content_type = resp.headers.get("content-type", "image/jpeg")
+                            return resp.content, content_type
+                except Exception as e:
+                    logger.error(f"Failed to download image from URL: {e}")
+                return None, None
 
-        if not product_image_path:
+            # Fallback: try local file
+            for ext in ["png", "jpg", "jpeg", "webp"]:
+                potential_path = os.path.join(temp_dir, f"{temp_id_or_url}.{ext}")
+                if os.path.exists(potential_path):
+                    mime_type = f"image/{'jpeg' if ext in ['jpg', 'jpeg'] else ext}"
+                    with open(potential_path, "rb") as f:
+                        return f.read(), mime_type
+            return None, None
+
+        # Load product image
+        product_image_data, product_mime_type = await load_image(request.product_image_temp_id)
+        if not product_image_data:
             raise HTTPException(status_code=404, detail="Product image not found")
 
-        # Read product image
-        with open(product_image_path, "rb") as f:
-            product_image_data = f.read()
-
-        # Find and read background image if provided
+        # Load background image if provided
         background_image_data = None
         background_mime_type = None
         if request.background_image_temp_id:
-            for ext in ["png", "jpg", "jpeg", "webp"]:
-                potential_path = os.path.join(temp_dir, f"{request.background_image_temp_id}.{ext}")
-                if os.path.exists(potential_path):
-                    with open(potential_path, "rb") as f:
-                        background_image_data = f.read()
-                    background_mime_type = f"image/{'jpeg' if ext in ['jpg', 'jpeg'] else ext}"
-                    break
+            background_image_data, background_mime_type = await load_image(request.background_image_temp_id)
 
         # Get the image editor
         editor = get_image_editor()
@@ -1566,20 +1574,17 @@ async def compose_scene_with_product(
             product_description=request.product_description,
         )
 
-        # Save generated image
+        # Upload generated image to cloud storage
         temp_id = str(uuid.uuid4())
         mime_type = result.get("mime_type", "image/png")
         ext = "png" if "png" in mime_type else "jpg"
         filename = f"{temp_id}.{ext}"
 
-        filepath = os.path.join(temp_dir, filename)
         import base64
         image_bytes = base64.b64decode(result["image_data"])
-        with open(filepath, "wb") as f:
-            f.write(image_bytes)
-
-        image_url = f"http://localhost:8000/static/temp/{filename}"
-        logger.info(f"Composed scene saved: {filepath}")
+        content_type = "image/png" if ext == "png" else "image/jpeg"
+        image_url = cloud_storage.upload_bytes(image_bytes, filename, "generated", content_type)
+        logger.info(f"Composed scene uploaded: {filename}, url: {image_url}")
 
         return {
             "image_id": temp_id,

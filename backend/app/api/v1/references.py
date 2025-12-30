@@ -14,6 +14,7 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.models.reference_analysis import ReferenceAnalysis
 from app.services.reference_analyzer.analyzer import ReferenceAnalyzer
+from app.services.cloud_storage import cloud_storage
 
 router = APIRouter()
 
@@ -493,7 +494,7 @@ async def upload_images_for_analysis(
         now = datetime.now()
         title = now.strftime("UPLOAD-%Y%m%d-%H%M%S-") + f"{now.microsecond // 1000:03d}"
 
-    # Save uploaded files and collect paths
+    # Upload files to cloud storage and collect URLs
     saved_files = []
     image_bytes_list = []
 
@@ -502,16 +503,15 @@ async def upload_images_for_analysis(
             # Generate unique filename
             ext = Path(file.filename).suffix if file.filename else ".jpg"
             unique_filename = f"{analysis_id}_{uuid.uuid4().hex[:8]}{ext}"
-            file_path = upload_dir / unique_filename
 
             # Read file content
             content = await file.read()
             image_bytes_list.append(content)
 
-            # Save to disk
-            with open(file_path, "wb") as f:
-                f.write(content)
-            saved_files.append(str(file_path))
+            # Upload to cloud storage
+            content_type = file.content_type or "image/jpeg"
+            file_url = cloud_storage.upload_bytes(content, unique_filename, "uploads", content_type)
+            saved_files.append(file_url)
 
         # Create DB record
         analysis = ReferenceAnalysis(

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.services.cloud_storage import cloud_storage
 from app.models.image_project import ImageProject
 from app.models.generated_image import GeneratedImage
 from app.models.product import Product
@@ -69,12 +70,10 @@ async def create_image_project(
         purpose_kr = {"ad": "광고", "info": "정보", "lifestyle": "라이프스타일"}
         title = f"{content_type_kr.get(project_data.content_type, project_data.content_type)} {purpose_kr.get(project_data.purpose, project_data.purpose)} 이미지"
 
-    # Save reference images from base64 if provided
+    # Upload reference images to cloud storage if provided
     reference_image_urls = None
     if project_data.reference_images_base64:
         reference_image_urls = []
-        ref_dir = os.path.join(settings.TEMP_DIR, "references")
-        os.makedirs(ref_dir, exist_ok=True)
 
         for idx, img_data in enumerate(project_data.reference_images_base64):
             try:
@@ -82,15 +81,13 @@ async def create_image_project(
                 image_bytes = base64.b64decode(img_data.data)
                 ext = "jpg" if "jpeg" in img_data.mime_type else img_data.mime_type.split("/")[-1]
                 filename = f"{project_id}_ref_{idx}.{ext}"
-                filepath = os.path.join(ref_dir, filename)
+                content_type = img_data.mime_type
 
-                with open(filepath, "wb") as f:
-                    f.write(image_bytes)
-
-                reference_image_urls.append(f"/static/references/{filename}")
-                logger.info(f"Saved reference image: {filepath}")
+                ref_url = cloud_storage.upload_bytes(image_bytes, filename, "references", content_type)
+                reference_image_urls.append(ref_url)
+                logger.info(f"Uploaded reference image: {filename}, url: {ref_url}")
             except Exception as e:
-                logger.error(f"Failed to save reference image {idx}: {e}")
+                logger.error(f"Failed to upload reference image {idx}: {e}")
 
     project = ImageProject(
         id=project_id,
@@ -389,18 +386,12 @@ PRODUCT INTEGRATION INSTRUCTIONS:
 
             if image_data:
                 ext = "png" if "png" in result_mime_type else "jpg"
-                temp_id = str(uuid.uuid4())
-                filename = f"{temp_id}.{ext}"
-
-                filepath = os.path.join(temp_dir, filename)
+                filename = f"{uuid.uuid4()}.{ext}"
                 image_bytes = base64.b64decode(image_data)
-                with open(filepath, "wb") as f:
-                    f.write(image_bytes)
-                logger.info(f"Saved image to {filepath}, size: {len(image_bytes)} bytes, exists: {os.path.exists(filepath)}")
-
-                image_url = f"/static/temp/{filename}"
+                content_type = "image/png" if ext == "png" else "image/jpeg"
+                image_url = cloud_storage.upload_bytes(image_bytes, filename, "generated", content_type)
+                logger.info(f"Uploaded image: {filename}, size: {len(image_bytes)} bytes, url: {image_url}")
             else:
-                # Mock fallback
                 image_url = f"/placeholder-{project_id}-{request.slide_number}-{variant_idx}.jpg"
 
             # Create GeneratedImage record
@@ -700,16 +691,11 @@ PRODUCT INTEGRATION INSTRUCTIONS:
 
             if image_data:
                 ext = "png" if "png" in result_mime_type else "jpg"
-                temp_id = str(uuid.uuid4())
-                filename = f"{temp_id}.{ext}"
-
-                filepath = os.path.join(temp_dir, filename)
+                filename = f"{uuid.uuid4()}.{ext}"
                 image_bytes = base64.b64decode(image_data)
-                with open(filepath, "wb") as f:
-                    f.write(image_bytes)
-                logger.info(f"Saved image to {filepath}, size: {len(image_bytes)} bytes, exists: {os.path.exists(filepath)}")
-
-                image_url = f"/static/temp/{filename}"
+                content_type = "image/png" if ext == "png" else "image/jpeg"
+                image_url = cloud_storage.upload_bytes(image_bytes, filename, "generated", content_type)
+                logger.info(f"Uploaded image: {filename}, size: {len(image_bytes)} bytes, url: {image_url}")
             else:
                 image_url = f"/placeholder-{project_id}-{request.slide_number}-{variant_idx}.jpg"
 
@@ -1038,16 +1024,11 @@ PRODUCT INTEGRATION INSTRUCTIONS:
 
             if image_data:
                 ext = "png" if "png" in result_mime_type else "jpg"
-                temp_id = str(uuid.uuid4())
-                filename = f"{temp_id}.{ext}"
-
-                filepath = os.path.join(temp_dir, filename)
+                filename = f"{uuid.uuid4()}.{ext}"
                 image_bytes = base64.b64decode(image_data)
-                with open(filepath, "wb") as f:
-                    f.write(image_bytes)
-                logger.info(f"Saved image to {filepath}, size: {len(image_bytes)} bytes, exists: {os.path.exists(filepath)}")
-
-                image_url = f"/static/temp/{filename}"
+                content_type = "image/png" if ext == "png" else "image/jpeg"
+                image_url = cloud_storage.upload_bytes(image_bytes, filename, "generated", content_type)
+                logger.info(f"Uploaded image: {filename}, size: {len(image_bytes)} bytes, url: {image_url}")
             else:
                 image_url = f"/placeholder-{project_id}-{slide_number}-{variant_idx}.jpg"
 
@@ -1333,16 +1314,11 @@ PRODUCT INTEGRATION INSTRUCTIONS:
 
                         if image_data:
                             ext = "png" if "png" in result_mime_type else "jpg"
-                            temp_id = str(uuid.uuid4())
-                            filename = f"{temp_id}.{ext}"
-
-                            filepath = os.path.join(temp_dir, filename)
+                            filename = f"{uuid.uuid4()}.{ext}"
                             image_bytes = base64.b64decode(image_data)
-                            with open(filepath, "wb") as f:
-                                f.write(image_bytes)
-                            logger.info(f"Saved image: {filepath}")
-
-                            image_url = f"/static/temp/{filename}"
+                            content_type = "image/png" if ext == "png" else "image/jpeg"
+                            image_url = cloud_storage.upload_bytes(image_bytes, filename, "generated", content_type)
+                            logger.info(f"Uploaded image: {filename}, size: {len(image_bytes)} bytes, url: {image_url}")
 
                             # Store this image for next slide's reference (carousel only)
                             if is_carousel:
