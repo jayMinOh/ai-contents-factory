@@ -83,8 +83,11 @@ async def create_product(
     )
     db.add(product)
     await db.commit()
-    await db.refresh(product)
-    return product
+    # Re-query to get database-generated fields (created_at, updated_at)
+    # instead of using refresh() which can trigger lazy loading in async context
+    stmt = select(Product).where(Product.id == product.id)
+    result = await db.execute(stmt)
+    return result.scalar_one()
 
 
 async def get_product(
@@ -158,8 +161,11 @@ async def update_product(
         setattr(product, field, value)
 
     await db.commit()
-    await db.refresh(product)
-    return product
+    # Re-query to get updated timestamp instead of using refresh()
+    # which can trigger lazy loading in async context
+    stmt = select(Product).where(Product.id == product_id)
+    result = await db.execute(stmt)
+    return result.scalar_one()
 
 
 async def delete_product(db: AsyncSession, brand_id: str, product_id: str) -> bool:

@@ -39,8 +39,11 @@ async def create_brand(db: AsyncSession, brand_data: BrandCreate) -> Brand:
     )
     db.add(brand)
     await db.commit()
-    await db.refresh(brand)
-    return brand
+    # Re-query to get database-generated fields (created_at, updated_at)
+    # instead of using refresh() which can trigger lazy loading in async context
+    stmt = select(Brand).where(Brand.id == brand.id)
+    result = await db.execute(stmt)
+    return result.scalar_one()
 
 
 async def get_brand(db: AsyncSession, brand_id: str) -> Optional[Brand]:
@@ -149,8 +152,11 @@ async def update_brand(
         setattr(brand, field, value)
 
     await db.commit()
-    await db.refresh(brand)
-    return brand
+    # Re-query to get updated timestamp instead of using refresh()
+    # which can trigger lazy loading in async context
+    stmt = select(Brand).where(Brand.id == brand_id)
+    result = await db.execute(stmt)
+    return result.scalar_one()
 
 
 async def delete_brand(db: AsyncSession, brand_id: str) -> bool:

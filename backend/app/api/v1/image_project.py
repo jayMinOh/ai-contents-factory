@@ -309,7 +309,7 @@ async def generate_images(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate images for a project slide."""
-    from app.services.video_generator.image_generator import get_image_generator, get_prompt_optimizer
+    from app.services.video_generator.image_generator import get_image_generator
     from app.services.image_editor import get_image_editor
     import base64
     import os
@@ -362,10 +362,9 @@ async def generate_images(
                 product_info += f" - {product.description}"
             prompt = f"{prompt}\n\n{product_info}"
 
-        # Optimize prompt
-        optimizer = get_prompt_optimizer()
-        optimized_prompt = await optimizer.optimize(prompt)
-        logger.info(f"Optimized prompt: {optimized_prompt[:100]}...")
+        # Use prompt directly (Gemini understands Korean)
+        optimized_prompt = prompt
+        logger.info(f"Using prompt directly: {optimized_prompt[:100]}...")
 
         temp_dir = os.path.join(settings.TEMP_DIR, "temp")
         os.makedirs(temp_dir, exist_ok=True)
@@ -537,7 +536,7 @@ async def generate_section(
     the reference image will be loaded and passed to Gemini with a prompt
     about maintaining style/mood consistency.
     """
-    from app.services.video_generator.image_generator import get_image_generator, get_prompt_optimizer
+    from app.services.video_generator.image_generator import get_image_generator
     from app.services.image_editor import get_image_editor
     import base64
     import os
@@ -628,10 +627,9 @@ async def generate_section(
                 product_info += f" - {product.description}"
             prompt = f"{prompt}\n\n{product_info}"
 
-        # Optimize prompt
-        optimizer = get_prompt_optimizer()
-        optimized_prompt = await optimizer.optimize(prompt)
-        logger.info(f"Optimized prompt: {optimized_prompt[:100]}...")
+        # Use prompt directly (Gemini understands Korean)
+        optimized_prompt = prompt
+        logger.info(f"Using prompt directly: {optimized_prompt[:100]}...")
 
         temp_dir = os.path.join(settings.TEMP_DIR, "temp")
         os.makedirs(temp_dir, exist_ok=True)
@@ -825,7 +823,7 @@ async def regenerate_section(
     Deletes existing images for that slide_number and generates new ones.
     Uses the reference image if one is set on the project.
     """
-    from app.services.video_generator.image_generator import get_image_generator, get_prompt_optimizer
+    from app.services.video_generator.image_generator import get_image_generator
     from app.services.image_editor import get_image_editor
     import base64
     import os
@@ -940,9 +938,8 @@ async def regenerate_section(
                 product_info += f" - {product.description}"
             prompt = f"{prompt}\n\n{product_info}"
 
-        # Optimize prompt
-        optimizer = get_prompt_optimizer()
-        optimized_prompt = await optimizer.optimize(prompt)
+        # Use prompt directly (Gemini understands Korean)
+        optimized_prompt = prompt
 
         temp_dir = os.path.join(settings.TEMP_DIR, "temp")
         os.makedirs(temp_dir, exist_ok=True)
@@ -1063,7 +1060,7 @@ async def run_background_image_generation(project_id: str):
     Background task to generate all images for a project.
     Similar to reference analysis background processing.
     """
-    from app.services.video_generator.image_generator import get_image_generator, get_prompt_optimizer
+    from app.services.video_generator.image_generator import get_image_generator
     from app.services.image_editor import get_image_editor
     from app.core.database import async_session_factory
     import base64
@@ -1166,10 +1163,9 @@ async def run_background_image_generation(project_id: str):
                         product_info += f" - {product.description}"
                     prompt = f"{prompt}\n\n{product_info}"
 
-                # Optimize prompt
-                optimizer = get_prompt_optimizer()
-                optimized_prompt = await optimizer.optimize(prompt)
-                logger.info(f"[최적화] optimized_prompt: {optimized_prompt[:150] if optimized_prompt else 'EMPTY'}")
+                # Use prompt directly (Gemini understands Korean, optimization was truncating prompts)
+                optimized_prompt = prompt
+                logger.info(f"[프롬프트] optimized_prompt: {optimized_prompt[:150] if optimized_prompt else 'EMPTY'}")
 
                 # Generate 2 variants per slide
                 num_variants = 2

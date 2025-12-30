@@ -462,15 +462,11 @@ Place the product naturally in the scene according to the description."""
             generator = get_image_generator(provider)
             logger.info(f"Generator instance: {type(generator).__name__}")
 
-            # Optimize prompt for image generation (translate to English, make visual-friendly)
-            if provider == "gemini_imagen":
-                from app.services.video_generator.image_generator import get_prompt_optimizer
-                optimizer = get_prompt_optimizer()
-                original_prompt = prompt
-                # Add context (brand/product info) to prompt for better generation
-                prompt_with_context = f"{context_info}\nScene: {prompt}" if context_info else prompt
-                prompt = await optimizer.optimize(prompt_with_context)
-                logger.info(f"Prompt optimized: '{original_prompt[:30]}...' -> '{prompt[:50]}...'")
+            # Add context (brand/product info) to prompt for better generation
+            # Skip optimization - Gemini understands Korean directly
+            if provider == "gemini_imagen" and context_info:
+                prompt = f"{context_info}\nScene: {prompt}"
+                logger.info(f"Using prompt with context: '{prompt[:80]}...'")
 
             logger.info(f"Calling generate() with prompt: {prompt[:50]}..., aspect_ratio: {aspect_ratio}")
 
@@ -1282,7 +1278,7 @@ async def generate_marketing_image(
     Returns:
         Generated image URL
     """
-    from app.services.video_generator.image_generator import get_image_generator, get_prompt_optimizer
+    from app.services.video_generator.image_generator import get_image_generator
     import base64
     import os
     from app.core.config import settings
@@ -1336,10 +1332,9 @@ USER REQUEST: {prompt}
 
 Create a professional marketing image. If a product is specified, ensure the product appears exactly as described with accurate colors, shape, materials, and branding. Place the product naturally in the scene according to the user's request."""
 
-        # Optimize prompt for image generation
-        optimizer = get_prompt_optimizer()
-        optimized_prompt = await optimizer.optimize(full_prompt)
-        logger.info(f"Optimized prompt: {optimized_prompt[:100]}...")
+        # Use prompt directly (Gemini understands Korean, optimization was truncating prompts)
+        optimized_prompt = full_prompt
+        logger.info(f"Using prompt directly: {optimized_prompt[:100]}...")
 
         # Generate image using Gemini Imagen
         generator = get_image_generator("gemini_imagen")

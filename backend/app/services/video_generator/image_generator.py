@@ -111,7 +111,7 @@ Example output: "Asian woman holding a Kerastase hair treatment bottle, nodding 
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
                     temperature=0.7,
-                    max_output_tokens=200,
+                    max_output_tokens=1024,  # Increased from 200 to prevent truncation
                 ),
             )
 
