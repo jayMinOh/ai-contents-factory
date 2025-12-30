@@ -59,19 +59,23 @@ class ReferenceAnalyzer:
             # 4. Gemini로 분석 (통신 오류 시 최대 3회 재시도)
             max_retries = 3
             last_error = None
+            print(f"[분석] Gemini 분석 시작 - 프레임 {len(frames)}개, duration={metadata.get('duration', 0):.1f}초")
 
             for attempt in range(1, max_retries + 1):
                 try:
+                    print(f"[분석] 시도 {attempt}/{max_retries}")
                     analysis = await self._analyze_with_gemini(
                         video_path=video_path,
                         frames=frames,
                         duration=metadata.get("duration", 0),
                     )
                     # 분석 성공 시 루프 종료
+                    print(f"[분석] 분석 성공!")
                     break
                 except Exception as e:
                     last_error = e
                     error_msg = str(e).lower()
+                    print(f"[분석] 시도 {attempt} 실패: {str(e)[:200]}")
 
                     # 통신/네트워크 관련 오류인지 확인
                     is_network_error = any(keyword in error_msg for keyword in [
@@ -557,6 +561,10 @@ JSON 형식으로만 응답하세요:
 ```"""
 
         # Gemini API 호출 (이미지 + 텍스트) - 10분 타임아웃
+        import time
+        start_time = time.time()
+        print(f"[Gemini] API 호출 시작 - 이미지 {len(images)}개, 타임아웃 600초")
+
         try:
             response = await asyncio.wait_for(
                 asyncio.to_thread(
@@ -565,8 +573,16 @@ JSON 형식으로만 응답하세요:
                 ),
                 timeout=600  # 10분
             )
+            elapsed = time.time() - start_time
+            print(f"[Gemini] API 호출 완료 - 소요시간: {elapsed:.1f}초")
         except asyncio.TimeoutError:
+            elapsed = time.time() - start_time
+            print(f"[Gemini] 타임아웃 발생! 소요시간: {elapsed:.1f}초")
             raise Exception("Gemini 분석 시간 초과 (10분). 영상이 너무 복잡하거나 서버가 바쁩니다.")
+        except Exception as e:
+            elapsed = time.time() - start_time
+            print(f"[Gemini] API 오류 발생! 소요시간: {elapsed:.1f}초, 에러: {str(e)[:200]}")
+            raise
 
         result_text = response.text
 
