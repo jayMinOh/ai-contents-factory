@@ -118,9 +118,14 @@ class GeminiImageEditor:
                     raw_data = part.inline_data.data
                     mime_type = part.inline_data.mime_type or "image/png"
 
-                    # raw_data is already bytes, encode to base64
                     if isinstance(raw_data, bytes):
-                        image_data = base64.b64encode(raw_data).decode("utf-8")
+                        # Check if raw_data is actual binary or base64-encoded bytes
+                        if raw_data[:2] == b'\xff\xd8' or raw_data[:4] == b'\x89PNG':
+                            # Actual binary image data - encode to base64
+                            image_data = base64.b64encode(raw_data).decode("utf-8")
+                        else:
+                            # Likely base64 string as bytes - just decode to string
+                            image_data = raw_data.decode("utf-8")
                     else:
                         # If it's already a string (base64), use as-is
                         image_data = raw_data
@@ -211,9 +216,14 @@ class GeminiImageEditor:
                     raw_data = part.inline_data.data
                     mime_type = part.inline_data.mime_type or "image/png"
 
-                    # raw_data is already bytes, encode to base64
                     if isinstance(raw_data, bytes):
-                        image_data = base64.b64encode(raw_data).decode("utf-8")
+                        # Check if raw_data is actual binary or base64-encoded bytes
+                        if raw_data[:2] == b'\xff\xd8' or raw_data[:4] == b'\x89PNG':
+                            # Actual binary image data - encode to base64
+                            image_data = base64.b64encode(raw_data).decode("utf-8")
+                        else:
+                            # Likely base64 string as bytes - just decode to string
+                            image_data = raw_data.decode("utf-8")
                     else:
                         # If it's already a string (base64), use as-is
                         image_data = raw_data
