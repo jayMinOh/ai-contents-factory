@@ -65,6 +65,7 @@ app = FastAPI(
     description="AI-powered marketing video creation platform",
     version="0.1.0",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # CORS
