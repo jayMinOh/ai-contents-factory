@@ -49,22 +49,11 @@ class ReferenceAnalyzer:
             # 2. 메타데이터 추출
             metadata = await self._get_metadata(video_path)
 
-            # 3. 키 프레임 추출 (영상 길이에 따라 동적 조절)
-            duration = metadata.get("duration", 0)
-            if duration <= 60:
-                # 1분 이하: 1 FPS (최대 60프레임)
-                target_frames = min(60, int(duration))
-            elif duration <= 600:
-                # 1~10분: 0.5 FPS (최대 300프레임)
-                target_frames = min(300, int(duration * 0.5))
-            else:
-                # 10분 이상: 0.25 FPS (최대 1500프레임)
-                target_frames = min(1500, int(duration * 0.25))
-
+            # 3. 키 프레임 추출 (영상 전체를 균등하게 샘플링)
             frames = await self._extract_frames(
                 video_path,
-                duration=duration,
-                target_frames=target_frames
+                duration=metadata.get("duration", 0),
+                target_frames=20
             )
 
             # 4. Gemini로 분석 (통신 오류 시 최대 3회 재시도)
@@ -266,15 +255,8 @@ class ReferenceAnalyzer:
     ) -> Dict[str, Any]:
         """Gemini로 영상 분석"""
 
-        # 프레임 샘플링 (영상 길이에 따라 Gemini 전송 수 조절)
-        # 짧은 영상: 더 많이, 긴 영상: 효율적으로
-        if duration <= 60:
-            max_gemini_frames = min(50, len(frames))  # 1분 이하: 최대 50개
-        elif duration <= 600:
-            max_gemini_frames = min(100, len(frames))  # 1~10분: 최대 100개
-        else:
-            max_gemini_frames = min(200, len(frames))  # 10분 이상: 최대 200개
-
+        # 프레임 샘플링 (최대 15개로 Gemini에 전송)
+        max_gemini_frames = 15
         if len(frames) > max_gemini_frames:
             sample_interval = len(frames) // max_gemini_frames
             sampled_frames = frames[::sample_interval][:max_gemini_frames]
