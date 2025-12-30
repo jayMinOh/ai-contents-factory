@@ -1,4 +1,38 @@
-import axios from "axios";
+import axios, { AxiosError, AxiosRequestConfig } from "axios";
+
+// Retry configuration
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelayMs: 1000, // 1 second base delay
+  maxDelayMs: 10000, // 10 seconds max delay
+};
+
+// Check if error is retryable (network errors or 5xx server errors)
+const isRetryableError = (error: AxiosError): boolean => {
+  // Network errors (no response)
+  if (!error.response) {
+    return true;
+  }
+
+  // 5xx server errors
+  const status = error.response.status;
+  return status >= 500 && status < 600;
+};
+
+// Calculate exponential backoff delay
+const getRetryDelay = (retryCount: number): number => {
+  // Exponential backoff: 1s, 2s, 4s, ...
+  const delay = RETRY_CONFIG.baseDelayMs * Math.pow(2, retryCount);
+  return Math.min(delay, RETRY_CONFIG.maxDelayMs);
+};
+
+// Sleep utility
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+// Extend AxiosRequestConfig to track retry count
+interface RetryableRequestConfig extends AxiosRequestConfig {
+  __retryCount?: number;
+}
 
 const api = axios.create({
   baseURL: "/api/v1",
@@ -9,17 +43,52 @@ const api = axios.create({
   timeout: 120000, // 2 minutes for long AI operations
 });
 
-// Response interceptor for 401 handling
+// Response interceptor for retry logic and 401 handling
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error: AxiosError) => {
+    const config = error.config as RetryableRequestConfig;
+
+    // If no config, cannot retry
+    if (!config) {
+      return Promise.reject(error);
+    }
+
+    // Initialize retry count
+    config.__retryCount = config.__retryCount ?? 0;
+
+    // Handle 401 (authentication failure) - do not retry
     if (error.response?.status === 401) {
-      // Redirect to login on authentication failure
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
         window.location.href = "/login";
       }
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    // Check if should retry
+    if (!isRetryableError(error) || config.__retryCount >= RETRY_CONFIG.maxRetries) {
+      return Promise.reject(error);
+    }
+
+    // Increment retry count
+    config.__retryCount += 1;
+
+    // Calculate delay with exponential backoff
+    const delay = getRetryDelay(config.__retryCount - 1);
+
+    // Log retry attempt (only in development)
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        `[API Retry] Attempt ${config.__retryCount}/${RETRY_CONFIG.maxRetries} ` +
+        `for ${config.method?.toUpperCase()} ${config.url} after ${delay}ms delay`
+      );
+    }
+
+    // Wait before retrying
+    await sleep(delay);
+
+    // Retry the request
+    return api(config);
   }
 );
 
