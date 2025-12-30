@@ -61,7 +61,7 @@ router = APIRouter()
 
 # ========== Video Project Endpoints ==========
 
-@router.post("/projects/", response_model=VideoProjectResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/projects", response_model=VideoProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
     project_data: VideoProjectCreate,
     db: AsyncSession = Depends(get_db),
@@ -105,7 +105,7 @@ async def create_project(
     return project
 
 
-@router.get("/projects/", response_model=List[VideoProjectSummary])
+@router.get("/projects", response_model=List[VideoProjectSummary])
 async def list_projects(
     brand_id: Optional[str] = None,
     status: Optional[str] = None,
@@ -530,7 +530,7 @@ Place the product naturally in the scene according to the description."""
     }
 
 
-@router.get("/projects/{project_id}/scenes/", response_model=List[SceneImageResponse])
+@router.get("/projects/{project_id}/scenes", response_model=List[SceneImageResponse])
 async def list_scene_images(
     project_id: str,
     active_only: bool = True,

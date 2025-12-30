@@ -66,7 +66,7 @@ def _product_to_response(p: Product) -> ProductResponse:
 # ========== Brand Endpoints ==========
 
 
-@router.post("/", response_model=BrandResponse)
+@router.post("", response_model=BrandResponse)
 async def create_brand(
     brand: BrandCreate,
     db: AsyncSession = Depends(get_db),
@@ -89,7 +89,7 @@ async def create_brand(
     )
 
 
-@router.get("/", response_model=List[BrandSummary])
+@router.get("", response_model=List[BrandSummary])
 async def list_brands(
     db: AsyncSession = Depends(get_db),
 ):
