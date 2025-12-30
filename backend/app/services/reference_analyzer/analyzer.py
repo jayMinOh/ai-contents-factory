@@ -139,6 +139,12 @@ class ReferenceAnalyzer:
             url,
         ]
 
+        # Add cookies if available
+        cookies_file = os.environ.get("YOUTUBE_COOKIES_FILE", "/app/config/youtube_cookies.txt")
+        if os.path.exists(cookies_file):
+            cmd.insert(-1, "--cookies")
+            cmd.insert(-1, cookies_file)
+
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,

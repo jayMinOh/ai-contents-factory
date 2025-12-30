@@ -23,11 +23,22 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create storage directories
-RUN mkdir -p storage/products storage/references storage/temp
+# Create storage and config directories
+RUN mkdir -p storage/products storage/references storage/temp config
 
 # Expose port
 EXPOSE 8000
 
 # Run migrations, fix missing columns, and start the application
-CMD ["sh", "-c", "echo 'Current migration state:' && alembic current && echo 'Running migrations...' && alembic upgrade head && echo 'Fixing missing columns...' && python fix_missing_columns.py && echo 'Startup complete!' && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Also decode YouTube cookies from base64 if provided
+CMD ["sh", "-c", "\
+  if [ -n \"$YOUTUBE_COOKIES_BASE64\" ]; then \
+    echo 'Decoding YouTube cookies...' && \
+    echo \"$YOUTUBE_COOKIES_BASE64\" | base64 -d > /app/config/youtube_cookies.txt && \
+    echo 'YouTube cookies saved'; \
+  fi && \
+  echo 'Current migration state:' && alembic current && \
+  echo 'Running migrations...' && alembic upgrade head && \
+  echo 'Fixing missing columns...' && python fix_missing_columns.py && \
+  echo 'Startup complete!' && \
+  exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
