@@ -55,9 +55,6 @@ Example output: "A sleek 30ml glass dropper bottle with frosted white finish, fe
 """
 
         def _analyze():
-            # Encode image to base64
-            image_b64 = base64.b64encode(image_data).decode("utf-8")
-
             return self.client.models.generate_content(
                 model="gemini-3-flash-preview",
                 contents=[
@@ -66,7 +63,7 @@ Example output: "A sleek 30ml glass dropper bottle with frosted white finish, fe
                             types.Part(
                                 inline_data=types.Blob(
                                     mime_type=mime_type,
-                                    data=image_b64,
+                                    data=image_data,  # raw bytes, not base64
                                 )
                             ),
                             types.Part(text="Describe this product's physical appearance for image generation:"),
@@ -189,8 +186,6 @@ IMPORTANT: For product images, the visual_prompt should be detailed enough that 
 """
 
         def _analyze():
-            image_b64 = base64.b64encode(image_data).decode("utf-8")
-
             return self.client.models.generate_content(
                 model="gemini-3-flash-preview",
                 contents=[
@@ -199,7 +194,7 @@ IMPORTANT: For product images, the visual_prompt should be detailed enough that 
                             types.Part(
                                 inline_data=types.Blob(
                                     mime_type=mime_type,
-                                    data=image_b64,
+                                    data=image_data,  # raw bytes, not base64
                                 )
                             ),
                             types.Part(text="Analyze this image for marketing content creation:"),
