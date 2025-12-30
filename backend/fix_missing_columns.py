@@ -72,5 +72,28 @@ async def fix_columns():
     await engine.dispose()
     print("Column fix complete!")
 
+
+async def clear_image_urls():
+    """Clear localhost image URLs from products table."""
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        print("DATABASE_URL not set, skipping")
+        return
+
+    engine = create_async_engine(database_url)
+
+    async with engine.begin() as conn:
+        try:
+            result = await conn.execute(text(
+                "UPDATE products SET image_url = NULL, image_description = NULL WHERE image_url LIKE '%localhost%'"
+            ))
+            print(f"Cleared {result.rowcount} localhost image URLs")
+        except Exception as e:
+            print(f"Error clearing image URLs: {e}")
+
+    await engine.dispose()
+
+
 if __name__ == "__main__":
     asyncio.run(fix_columns())
+    asyncio.run(clear_image_urls())
