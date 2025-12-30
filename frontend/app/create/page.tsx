@@ -277,14 +277,34 @@ function CreatePageContent() {
     enabled: !!config.referenceId && config.method === "reference",
   });
 
-  // Reset selected items when reference changes
+  // Select all items when reference analysis is loaded
   useEffect(() => {
-    setSelectedHookPointIndices([]);
-    setSelectedEdgePointIndices([]);
-    setSelectedTriggerIndices([]);
-    setSelectedSellingPointIndices([]);
-    setSelectedRecommendationIndices([]);
-  }, [config.referenceId]);
+    if (selectedReferenceAnalysis) {
+      // Select all by default
+      setSelectedHookPointIndices(
+        selectedReferenceAnalysis.hook_points?.map((_, i) => i) || []
+      );
+      setSelectedEdgePointIndices(
+        selectedReferenceAnalysis.edge_points?.map((_, i) => i) || []
+      );
+      setSelectedTriggerIndices(
+        selectedReferenceAnalysis.emotional_triggers?.map((_, i) => i) || []
+      );
+      setSelectedSellingPointIndices(
+        selectedReferenceAnalysis.selling_points?.map((_, i) => i) || []
+      );
+      setSelectedRecommendationIndices(
+        selectedReferenceAnalysis.recommendations?.map((_, i) => i) || []
+      );
+    } else {
+      // Reset when no reference is selected
+      setSelectedHookPointIndices([]);
+      setSelectedEdgePointIndices([]);
+      setSelectedTriggerIndices([]);
+      setSelectedSellingPointIndices([]);
+      setSelectedRecommendationIndices([]);
+    }
+  }, [selectedReferenceAnalysis]);
 
   // Filter to only show completed references
   const completedReferences = allReferences.filter(
