@@ -116,8 +116,11 @@ CRITICAL RULES:
             )
 
         try:
-            logger.info("Calling Gemini API for image generation...")
+            logger.info(f"=== IMAGE EDITOR ===")
+            logger.info(f"[EDIT PROMPT] 이미지 편집에 사용될 프롬프트:\n{edit_prompt}")
+            logger.info(f"[CONFIG] model={self.model_name}, temperature=0.4, aspect_ratio={aspect_ratio}, images_count={len(contents)-1}")
             response = await asyncio.to_thread(_generate)
+            logger.info(f"[RESPONSE] 이미지 생성 완료")
 
             # Extract the generated image from response
             image_data = None

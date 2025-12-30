@@ -116,9 +116,12 @@ Example output: "Asian woman holding a Kerastase hair treatment bottle, nodding 
             )
 
         try:
+            logger.info(f"=== PROMPT OPTIMIZER ===")
+            logger.info(f"[INPUT] 원본 프롬프트:\n{prompt}")
             response = await asyncio.to_thread(_generate)
             optimized = response.text.strip()
-            logger.info(f"Prompt optimized: '{prompt[:50]}...' -> '{optimized[:50]}...'")
+            logger.info(f"[OUTPUT] 최적화된 프롬프트:\n{optimized}")
+            logger.info(f"=== PROMPT OPTIMIZER END ===")
             return optimized
         except Exception as e:
             logger.warning(f"Prompt optimization failed: {e}, using original")
@@ -239,10 +242,12 @@ CRITICAL RULES:
             )
 
         try:
-            logger.info(f"Calling Nano Banana Pro API with enhanced_prompt: {enhanced_prompt[:100]}...")
+            logger.info(f"=== IMAGE GENERATOR ===")
+            logger.info(f"[FINAL PROMPT] 이미지 생성에 사용될 프롬프트:\n{enhanced_prompt}")
+            logger.info(f"[CONFIG] model={self.model_name}, temperature=0.4, aspect_ratio={aspect_ratio}")
 
             response = await asyncio.to_thread(_generate)
-            logger.info(f"Nano Banana Pro API response received: {type(response)}")
+            logger.info(f"[RESPONSE] 이미지 생성 완료")
 
             # Extract image from response
             image_data = None
