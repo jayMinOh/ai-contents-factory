@@ -233,7 +233,7 @@ export default function HistoryPage() {
                   <div className="aspect-[4/3] bg-gradient-to-br from-muted/50 to-muted relative overflow-hidden">
                     {thumbnailUrl ? (
                       <img
-                        src={`http://localhost:8000${thumbnailUrl}`}
+                        src={`${thumbnailUrl}`}
                         alt={project.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
