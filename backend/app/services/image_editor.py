@@ -99,7 +99,6 @@ class GeminiImageEditor:
                     response_modalities=["IMAGE"],
                     image_config=types.ImageConfig(
                         aspect_ratio=aspect_ratio,
-                        image_size="2K",
                     ),
                 ),
             )
@@ -198,7 +197,6 @@ class GeminiImageEditor:
                     response_modalities=["IMAGE"],
                     image_config=types.ImageConfig(
                         aspect_ratio=aspect_ratio,
-                        image_size="2K",
                     ),
                 ),
             )
