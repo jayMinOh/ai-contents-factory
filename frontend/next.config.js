@@ -30,11 +30,11 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "**.cos.ap-seoul.myqcloud.com",
+        hostname: "ai-contents-factory-1322661923.cos.ap-seoul.myqcloud.com",
       },
       {
         protocol: "https",
-        hostname: "**.myqcloud.com",
+        hostname: "*.cos.ap-seoul.myqcloud.com",
       },
     ],
   },
