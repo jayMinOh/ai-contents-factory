@@ -472,13 +472,10 @@ function ProductCard({ product, brandId }: { product: Product; brandId: string }
                 </div>
               ) : product.image_url ? (
                 <>
-                  <Image
+                  <img
                     src={product.image_url}
                     alt={product.name}
-                    fill
-                    className="object-cover"
-                    sizes="80px"
-                    unoptimized
+                    className="absolute inset-0 w-full h-full object-cover"
                   />
                   <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center justify-center">
                     <Upload className="w-5 h-5 text-white" />
