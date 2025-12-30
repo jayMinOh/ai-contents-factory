@@ -139,7 +139,7 @@ class ReferenceAnalyzer:
             "-o", str(output_path),
             "--no-playlist",
             "--no-check-certificates",
-            "--verbose",  # 디버깅용 상세 로그
+            "--remote-components", "ejs:github",  # YouTube JS 챌린지 해결용
             url,
         ]
 
@@ -150,6 +150,9 @@ class ReferenceAnalyzer:
         if os.path.exists(cookies_file):
             cmd.insert(-1, "--cookies")
             cmd.insert(-1, cookies_file)
+            print(f"YouTube 쿠키 사용: {cookies_file}")
+        else:
+            print(f"경고: YouTube 쿠키 파일 없음: {cookies_file}")
 
         process = await asyncio.create_subprocess_exec(
             *cmd,
