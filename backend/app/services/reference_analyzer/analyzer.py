@@ -7,7 +7,8 @@ from typing import Optional, List, Dict, Any, Union
 from pathlib import Path
 import base64
 
-import google.generativeai as genai
+from google import genai
+from google.genai.types import HttpOptions
 from PIL import Image
 
 from app.core.config import settings
@@ -23,9 +24,12 @@ class ReferenceAnalyzer:
     """
 
     def __init__(self):
-        genai.configure(api_key=settings.GOOGLE_API_KEY)
-        # 레퍼런스 분석은 안정적인 gemini-2.5-flash 사용 (프리뷰 모델은 할루시네이션 위험)
-        self.model = genai.GenerativeModel("gemini-2.5-flash")
+        # 새 SDK 사용: 타임아웃 10분 (600,000ms) 설정
+        self.client = genai.Client(
+            api_key=settings.GOOGLE_API_KEY,
+            http_options=HttpOptions(timeout=600000)  # 10분 in milliseconds
+        )
+        self.model_name = "gemini-2.5-flash"
         self.temp_dir = Path(settings.TEMP_DIR)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -560,29 +564,21 @@ JSON 형식으로만 응답하세요:
 }}
 ```"""
 
-        # Gemini API 호출 (이미지 + 텍스트) - 10분 타임아웃
+        # Gemini API 호출 (이미지 + 텍스트) - 타임아웃은 Client 초기화 시 설정됨 (10분)
         import time
-        from google.generativeai.types import RequestOptions
 
         start_time = time.time()
-        print(f"[Gemini] API 호출 시작 - 이미지 {len(images)}개, 타임아웃 600초")
+        print(f"[Gemini] API 호출 시작 - 이미지 {len(images)}개, 타임아웃 600초 (새 SDK)")
 
         try:
-            # Gemini SDK 내부 타임아웃을 600초로 설정
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.model.generate_content,
-                    [prompt] + images,
-                    request_options=RequestOptions(timeout=600)
-                ),
-                timeout=660  # 외부 타임아웃은 내부보다 조금 더 길게
+            # 새 SDK 사용: client.models.generate_content()
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model=self.model_name,
+                contents=[prompt] + images
             )
             elapsed = time.time() - start_time
             print(f"[Gemini] API 호출 완료 - 소요시간: {elapsed:.1f}초")
-        except asyncio.TimeoutError:
-            elapsed = time.time() - start_time
-            print(f"[Gemini] 타임아웃 발생! 소요시간: {elapsed:.1f}초")
-            raise Exception("Gemini 분석 시간 초과 (10분). 영상이 너무 복잡하거나 서버가 바쁩니다.")
         except Exception as e:
             elapsed = time.time() - start_time
             print(f"[Gemini] API 오류 발생! 소요시간: {elapsed:.1f}초, 에러: {str(e)[:200]}")
@@ -600,8 +596,9 @@ JSON 형식으로만 응답하세요:
         retry_prompt = f"이전 응답의 JSON 형식이 올바르지 않았습니다. 순수한 JSON만 출력해주세요. 마크다운 코드 블록 없이, 설명 없이, 오직 JSON 객체만 출력하세요.\n\n원본 요청:\n{prompt}"
 
         retry_response = await asyncio.to_thread(
-            self.model.generate_content,
-            [retry_prompt] + images
+            self.client.models.generate_content,
+            model=self.model_name,
+            contents=[retry_prompt] + images
         )
 
         parsed = self._extract_and_parse_json(retry_response.text)
@@ -1013,8 +1010,9 @@ JSON 형식으로만 응답하세요:
 ```"""
 
         response = await asyncio.to_thread(
-            self.model.generate_content,
-            [prompt] + images
+            self.client.models.generate_content,
+            model=self.model_name,
+            contents=[prompt] + images
         )
 
         result_text = response.text
@@ -1028,8 +1026,9 @@ JSON 형식으로만 응답하세요:
         retry_prompt = f"이전 응답의 JSON 형식이 올바르지 않았습니다. 순수한 JSON만 출력해주세요.\n\n원본 요청:\n{prompt}"
 
         retry_response = await asyncio.to_thread(
-            self.model.generate_content,
-            [retry_prompt] + images
+            self.client.models.generate_content,
+            model=self.model_name,
+            contents=[retry_prompt] + images
         )
 
         parsed = self._extract_and_parse_json(retry_response.text)
