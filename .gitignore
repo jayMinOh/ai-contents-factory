@@ -203,3 +203,10 @@ htmlcov/
 
 # Uploads directory
 backend/uploads/
+
+# Backend temporary files
+backend/storage/frames_*/
+backend/storage/video_*.mp4
+backend/storage/temp/*
+backend/-*/
+.playwright-mcp/
