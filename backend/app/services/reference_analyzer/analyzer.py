@@ -222,15 +222,27 @@ class ReferenceAnalyzer:
             fps = 1
 
         print(f"프레임 추출 시작: {video_path}, duration={duration:.1f}s, target={target_frames}, fps={fps:.2f}")
+
+        # 영상 파일 존재 확인
+        video_file = Path(video_path)
+        if video_file.exists():
+            print(f"영상 파일 확인: {video_path}, 크기={video_file.stat().st_size} bytes")
+        else:
+            print(f"경고: 영상 파일이 존재하지 않음! {video_path}")
+
         print(f"frames_dir: {frames_dir}")
+
+        # 절대 경로로 변환 (Railway 환경에서 작업 디렉토리 문제 방지)
+        abs_video_path = str(Path(video_path).resolve())
+        abs_frames_pattern = str((frames_dir / "frame_%04d.jpg").resolve())
 
         cmd = [
             "ffmpeg",
             "-y",  # 덮어쓰기 자동 승인
-            "-i", video_path,
+            "-i", abs_video_path,
             "-vf", f"fps={fps}",
             "-q:v", "2",
-            str(frames_dir / "frame_%04d.jpg"),
+            abs_frames_pattern,
         ]
 
         print(f"FFmpeg 명령: {' '.join(cmd)}")
