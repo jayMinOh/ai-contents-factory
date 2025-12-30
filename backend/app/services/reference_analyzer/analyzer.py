@@ -221,6 +221,8 @@ class ReferenceAnalyzer:
         else:
             fps = 1
 
+        print(f"프레임 추출 시작: {video_path}, duration={duration:.1f}s, target={target_frames}, fps={fps:.2f}")
+
         cmd = [
             "ffmpeg",
             "-i", video_path,
@@ -235,7 +237,11 @@ class ReferenceAnalyzer:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        await process.communicate()
+        stdout, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            error_msg = stderr.decode() if stderr else "Unknown error"
+            print(f"FFmpeg 프레임 추출 실패 (returncode={process.returncode}): {error_msg[:500]}")
 
         frames = []
         for i, frame_file in enumerate(sorted(frames_dir.glob("frame_*.jpg"))):
@@ -244,6 +250,11 @@ class ReferenceAnalyzer:
                 "timestamp": i / fps,
                 "index": i,
             })
+
+        print(f"프레임 추출 완료: {len(frames)}개 추출됨")
+
+        if not frames:
+            print(f"경고: 프레임이 추출되지 않음! video_path={video_path}")
 
         return frames
 
@@ -255,6 +266,10 @@ class ReferenceAnalyzer:
     ) -> Dict[str, Any]:
         """Gemini로 영상 분석"""
 
+        # 프레임이 없으면 분석 불가
+        if not frames:
+            raise Exception("영상에서 프레임을 추출할 수 없습니다. 영상 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다.")
+
         # 프레임 샘플링 (최대 15개로 Gemini에 전송)
         max_gemini_frames = 15
         if len(frames) > max_gemini_frames:
@@ -263,11 +278,16 @@ class ReferenceAnalyzer:
         else:
             sampled_frames = frames
 
+        print(f"Gemini 분석: {len(frames)}개 프레임 중 {len(sampled_frames)}개 샘플링")
+
         # 이미지 로드
         images = []
         for frame in sampled_frames:
             img = Image.open(frame["path"])
             images.append(img)
+
+        if not images:
+            raise Exception("프레임 이미지를 로드할 수 없습니다.")
 
         # 분석 프롬프트
         prompt = f"""당신은 10년 경력의 퍼포먼스 마케팅 전문가입니다. 이 영상 프레임들을 심층 분석해주세요.
