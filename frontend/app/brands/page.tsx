@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+
+// Convert localhost URLs to relative paths for production compatibility
+const normalizeImageUrl = (url: string | undefined): string | undefined => {
+  if (!url) return undefined;
+  return url.replace(/^https?:\/\/localhost:\d+/, "");
+};
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   brandApi,
@@ -470,10 +476,10 @@ function ProductCard({ product, brandId }: { product: Product; brandId: string }
                 <div className="absolute inset-0 flex items-center justify-center bg-[rgb(var(--muted))]">
                   <Loader2 className="w-6 h-6 text-orange-500 animate-spin" />
                 </div>
-              ) : product.image_url ? (
+              ) : normalizeImageUrl(product.image_url) ? (
                 <>
                   <Image
-                    src={product.image_url}
+                    src={normalizeImageUrl(product.image_url)!}
                     alt={product.name}
                     fill
                     className="object-cover"

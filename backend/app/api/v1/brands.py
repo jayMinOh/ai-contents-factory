@@ -279,7 +279,8 @@ async def upload_product_image(
     with open(filepath, "wb") as f:
         f.write(image_data)
 
-    image_url = f"http://localhost:8000/static/products/{filename}"
+    # Use relative path - frontend will prepend backend URL
+    image_url = f"/static/products/{filename}"
     logger.info(f"Product image saved: {filepath}")
 
     # Analyze image with Gemini Vision
