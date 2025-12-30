@@ -18,7 +18,7 @@ celery==5.3.6
 qdrant-client==1.7.0
 
 # AI/ML
-google-genai>=1.0.0
+google-genai>=1.14.0
 google-generativeai>=0.3.1,<0.4.0
 openai==1.10.0  # Whisper용 (선택사항)
 langchain==0.1.4
