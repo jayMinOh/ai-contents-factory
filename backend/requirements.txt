@@ -35,6 +35,7 @@ Pillow==10.2.0
 
 # Utilities
 pydantic==2.5.3
+email-validator>=2.0.0
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
 httpx==0.26.0
