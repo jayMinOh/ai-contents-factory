@@ -345,15 +345,20 @@ class CompositeImageGenerator:
                     mime_type = part.inline_data.mime_type or "image/png"
 
                     if isinstance(raw_data, bytes):
+                        # Log first bytes for debugging
+                        logger.info(f"raw_data type: bytes, first 20 bytes: {raw_data[:20]}")
                         # Check if raw_data is actual binary or base64-encoded bytes
                         # JPEG starts with FF D8 FF, PNG starts with 89 50 4E 47
                         if raw_data[:2] == b'\xff\xd8' or raw_data[:4] == b'\x89PNG':
                             # Actual binary image data
+                            logger.info("Detected actual binary image, encoding to base64")
                             image_data = base64.b64encode(raw_data).decode("utf-8")
                         else:
                             # Likely base64 string as bytes, decode to string
+                            logger.info("Detected base64 string as bytes, decoding to string")
                             image_data = raw_data.decode("utf-8")
                     else:
+                        logger.info(f"raw_data type: {type(raw_data)}, first 50 chars: {str(raw_data)[:50]}")
                         image_data = raw_data
 
                     break
