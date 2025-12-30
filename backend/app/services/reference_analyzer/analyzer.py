@@ -52,7 +52,7 @@ class ReferenceAnalyzer:
             frames = await self._extract_frames(
                 video_path,
                 duration=metadata.get("duration", 0),
-                target_frames=20
+                target_frames=30
             )
 
             # 4. Gemini로 분석 (통신 오류 시 최대 3회 재시도)
@@ -254,8 +254,8 @@ class ReferenceAnalyzer:
     ) -> Dict[str, Any]:
         """Gemini로 영상 분석"""
 
-        # 프레임 샘플링 (최대 15개로 Gemini에 전송)
-        max_gemini_frames = 15
+        # 프레임 샘플링 (최대 25개로 Gemini에 전송)
+        max_gemini_frames = 25
         if len(frames) > max_gemini_frames:
             sample_interval = len(frames) // max_gemini_frames
             sampled_frames = frames[::sample_interval][:max_gemini_frames]
