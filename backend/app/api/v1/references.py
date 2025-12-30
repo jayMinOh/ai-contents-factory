@@ -574,14 +574,16 @@ async def run_upload_analysis(
             analysis.status = AnalysisStatus.ANALYZING.value
             analysis.error_message = None
 
-            # Store images as base64 for display
-            all_images_base64 = [
-                f"data:image/jpeg;base64,{base64.b64encode(img).decode('utf-8')}"
-                for img in image_bytes_list
-            ]
-            if all_images_base64:
-                analysis.thumbnail_url = all_images_base64[0]
-                analysis.images = all_images_base64
+            # Upload images to cloud storage
+            all_image_urls = []
+            for idx, img in enumerate(image_bytes_list):
+                filename = f"{analysis.id}_{idx}.jpg"
+                image_url = cloud_storage.upload_bytes(img, filename, "references", "image/jpeg")
+                all_image_urls.append(image_url)
+
+            if all_image_urls:
+                analysis.thumbnail_url = all_image_urls[0]
+                analysis.images = all_image_urls
 
             await db.commit()
 
@@ -668,8 +670,8 @@ async def run_analysis(analysis_id: str, url: str, extract_audio: bool):
             # Try to download and detect media type
             media_type = None  # 'image', 'video', or None
             image_bytes_list = []
-            thumbnail_base64 = None
-            all_images_base64 = []
+            thumbnail_url = None
+            all_image_urls = []
             result = None
 
             # Check if URL is a supported SNS platform
@@ -691,12 +693,13 @@ async def run_analysis(analysis_id: str, url: str, extract_audio: bool):
                                 if extracted_images:
                                     media_type = 'image'
                                     image_bytes_list = extracted_images
-                                    first_image = image_bytes_list[0]
-                                    thumbnail_base64 = f"data:image/jpeg;base64,{base64.b64encode(first_image).decode('utf-8')}"
-                                    all_images_base64 = [
-                                        f"data:image/jpeg;base64,{base64.b64encode(img).decode('utf-8')}"
-                                        for img in image_bytes_list
-                                    ]
+                                    # Upload images to cloud storage
+                                    for idx, img in enumerate(image_bytes_list):
+                                        filename = f"{analysis.id}_{idx}.jpg"
+                                        img_url = cloud_storage.upload_bytes(img, filename, "references", "image/jpeg")
+                                        all_image_urls.append(img_url)
+                                    if all_image_urls:
+                                        thumbnail_url = all_image_urls[0]
                                     print(f"instaloader 성공! 이미지 {len(image_bytes_list)}개 추출")
                             except Exception as insta_err:
                                 print(f"instaloader 실패: {insta_err}")
@@ -719,13 +722,13 @@ async def run_analysis(analysis_id: str, url: str, extract_audio: bool):
                                     for img_path in downloaded_images:
                                         with open(img_path, 'rb') as f:
                                             image_bytes_list.append(f.read())
-                                    if image_bytes_list:
-                                        first_image = image_bytes_list[0]
-                                        thumbnail_base64 = f"data:image/jpeg;base64,{base64.b64encode(first_image).decode('utf-8')}"
-                                        all_images_base64 = [
-                                            f"data:image/jpeg;base64,{base64.b64encode(img).decode('utf-8')}"
-                                            for img in image_bytes_list
-                                        ]
+                                    # Upload images to cloud storage
+                                    for idx, img in enumerate(image_bytes_list):
+                                        filename = f"{analysis.id}_{idx}.jpg"
+                                        img_url = cloud_storage.upload_bytes(img, filename, "references", "image/jpeg")
+                                        all_image_urls.append(img_url)
+                                    if all_image_urls:
+                                        thumbnail_url = all_image_urls[0]
                                     print(f"gallery-dl 성공! 이미지 {len(image_bytes_list)}개 추출")
                             except Exception as gdl_err:
                                 print(f"gallery-dl 실패: {gdl_err}")
@@ -739,10 +742,10 @@ async def run_analysis(analysis_id: str, url: str, extract_audio: bool):
                     media_type = None
 
             # Save thumbnail and images to DB if we have them
-            if thumbnail_base64:
-                analysis.thumbnail_url = thumbnail_base64
-            if all_images_base64:
-                analysis.images = all_images_base64
+            if thumbnail_url:
+                analysis.thumbnail_url = thumbnail_url
+            if all_image_urls:
+                analysis.images = all_image_urls
             await db.commit()
 
             # Run analysis if not already done
