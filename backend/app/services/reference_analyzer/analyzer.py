@@ -222,14 +222,18 @@ class ReferenceAnalyzer:
             fps = 1
 
         print(f"프레임 추출 시작: {video_path}, duration={duration:.1f}s, target={target_frames}, fps={fps:.2f}")
+        print(f"frames_dir: {frames_dir}")
 
         cmd = [
             "ffmpeg",
+            "-y",  # 덮어쓰기 자동 승인
             "-i", video_path,
             "-vf", f"fps={fps}",
             "-q:v", "2",
             str(frames_dir / "frame_%04d.jpg"),
         ]
+
+        print(f"FFmpeg 명령: {' '.join(cmd)}")
 
         process = await asyncio.create_subprocess_exec(
             *cmd,
@@ -241,7 +245,10 @@ class ReferenceAnalyzer:
 
         if process.returncode != 0:
             error_msg = stderr.decode() if stderr else "Unknown error"
-            print(f"FFmpeg 프레임 추출 실패 (returncode={process.returncode}): {error_msg[:500]}")
+            # 에러 메시지에서 마지막 10줄만 출력 (핵심 에러 부분)
+            error_lines = error_msg.strip().split('\n')
+            last_lines = '\n'.join(error_lines[-10:])
+            print(f"FFmpeg 프레임 추출 실패 (returncode={process.returncode}):\n{last_lines}")
 
         frames = []
         for i, frame_file in enumerate(sorted(frames_dir.glob("frame_*.jpg"))):
