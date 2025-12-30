@@ -37,6 +37,11 @@ CMD ["sh", "-c", "\
     echo \"$YOUTUBE_COOKIES_BASE64\" | base64 -d > /app/config/youtube_cookies.txt && \
     echo 'YouTube cookies saved'; \
   fi && \
+  if [ -n \"$INSTAGRAM_COOKIES_BASE64\" ]; then \
+    echo 'Decoding Instagram cookies...' && \
+    echo \"$INSTAGRAM_COOKIES_BASE64\" | base64 -d > /app/config/instagram_cookies.txt && \
+    echo 'Instagram cookies saved'; \
+  fi && \
   echo 'Current migration state:' && alembic current && \
   echo 'Running migrations...' && alembic upgrade head && \
   echo 'Fixing missing columns...' && python fix_missing_columns.py && \

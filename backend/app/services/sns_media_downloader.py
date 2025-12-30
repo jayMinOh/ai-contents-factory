@@ -95,6 +95,7 @@ class SNSMediaDownloader:
 
     # Default cookies file paths to check
     DEFAULT_COOKIES_PATHS = [
+        '/app/config/instagram_cookies.txt',  # Docker path
         'config/instagram_cookies.txt',
         'config/cookies.txt',
         'instagram_cookies.txt',
