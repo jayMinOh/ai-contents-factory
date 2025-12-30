@@ -240,8 +240,21 @@ class GeminiImagenGenerator(ImageGeneratorBase):
 
             for part in response.candidates[0].content.parts:
                 if hasattr(part, 'inline_data') and part.inline_data:
-                    image_data = base64.b64encode(part.inline_data.data).decode("utf-8")
+                    raw_data = part.inline_data.data
                     mime_type = part.inline_data.mime_type or "image/png"
+
+                    if isinstance(raw_data, bytes):
+                        # Check if raw_data is actual binary or base64-encoded bytes
+                        # JPEG starts with FF D8, PNG starts with 89 50 4E 47
+                        if raw_data[:2] == b'\xff\xd8' or raw_data[:4] == b'\x89PNG':
+                            # Actual binary image data - encode to base64
+                            image_data = base64.b64encode(raw_data).decode("utf-8")
+                        else:
+                            # Likely base64 string as bytes - just decode to string
+                            image_data = raw_data.decode("utf-8")
+                    else:
+                        # Already a string (base64)
+                        image_data = raw_data
                     break
 
             if not image_data:
