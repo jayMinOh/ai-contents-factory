@@ -133,7 +133,9 @@ class ReferenceAnalyzer:
 
         cmd = [
             "yt-dlp",
-            "-f", "best[height<=720]/best",  # 720p 우선, 없으면 best
+            # 비디오+오디오 포맷 명시적 선택 (오디오만 다운로드 방지)
+            "-f", "bestvideo[height<=720]+bestaudio/bestvideo+bestaudio/best[height<=720]/best",
+            "--merge-output-format", "mp4",  # mp4로 병합
             "-o", str(output_path),
             "--no-playlist",
             "--no-check-certificates",
