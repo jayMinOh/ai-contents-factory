@@ -556,11 +556,11 @@ JSON 형식으로만 응답하세요:
 }}
 ```"""
 
-        # Gemini API 호출 (이미지 + 텍스트) - 타임아웃 300초 설정
+        # Gemini API 호출 (이미지 + 텍스트) - 백그라운드 작업이므로 타임아웃 10분
         response = await asyncio.to_thread(
             self.model.generate_content,
             [prompt] + images,
-            request_options={"timeout": 300}  # 5분 타임아웃
+            request_options={"timeout": 600}  # 10분 타임아웃
         )
 
         result_text = response.text
