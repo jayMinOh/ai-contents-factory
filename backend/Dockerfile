@@ -23,4 +23,4 @@ RUN mkdir -p storage/products storage/references storage/temp
 EXPOSE 8000
 
 # Run migrations (ignore errors if already applied) and start the application
-CMD alembic upgrade head || alembic stamp head; uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD ["sh", "-c", "alembic upgrade head || alembic stamp head; exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
