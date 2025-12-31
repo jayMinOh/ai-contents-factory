@@ -1390,12 +1390,11 @@ async def download_image(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Download a generated image with the project's aspect ratio applied.
+    Download a generated image as-is (original size from AI generation).
 
-    The image will be resized/cropped to match the project's aspect_ratio setting.
-    Returns the processed image as a streaming response for direct download.
+    The AI generates images at the requested aspect ratio during creation,
+    so no post-processing is needed. Returns the original image directly.
     """
-    from PIL import Image
     import io
     import os
     from app.core.config import settings
@@ -1409,17 +1408,6 @@ async def download_image(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Image not found: {image_id}"
-        )
-
-    # Get the project to retrieve aspect_ratio
-    project_query = select(ImageProject).where(ImageProject.id == gen_image.image_project_id)
-    project_result = await db.execute(project_query)
-    project = project_result.scalar_one_or_none()
-
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project not found for image: {image_id}"
         )
 
     # Resolve the image file path or URL
@@ -1450,105 +1438,42 @@ async def download_image(
     else:
         image_path = image_url
 
-    if image_path and not os.path.exists(image_path):
+    if image_path:
+        if not os.path.exists(image_path):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Image file not found: {image_url}"
+            )
+        with open(image_path, "rb") as f:
+            image_data = f.read()
+
+    if not image_data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Image file not found: {image_url}"
+            detail=f"Could not load image: {image_url}"
         )
 
-    # Parse aspect ratio (e.g., "16:9", "1:1", "9:16", "4:5")
-    aspect_ratio = project.aspect_ratio or "1:1"
-    try:
-        ratio_parts = aspect_ratio.split(":")
-        target_width_ratio = int(ratio_parts[0])
-        target_height_ratio = int(ratio_parts[1])
-    except (ValueError, IndexError):
-        target_width_ratio = 1
-        target_height_ratio = 1
+    # Determine content type from URL extension
+    ext = os.path.splitext(image_url)[1].lower() if '.' in image_url else '.jpg'
+    if ext in ['.jpg', '.jpeg']:
+        content_type = 'image/jpeg'
+        file_ext = 'jpg'
+    else:
+        content_type = 'image/png'
+        file_ext = 'png'
 
-    # Open and process the image
-    try:
-        # Open image from bytes (COS) or file path (local)
-        if image_data:
-            img = Image.open(io.BytesIO(image_data))
-            # Determine format from URL
-            ext = os.path.splitext(image_url)[1].lower() if '.' in image_url else '.jpg'
-        else:
-            img = Image.open(image_path)
-            ext = os.path.splitext(image_path)[1].lower()
+    # Generate filename
+    filename = f"image_{image_id}.{file_ext}"
 
-        with img:
-            original_width, original_height = img.size
+    logger.info(f"Download image {image_id}: {len(image_data)} bytes (original)")
 
-            # Calculate target dimensions - fit image into target ratio without cropping
-            target_ratio = target_width_ratio / target_height_ratio
-            original_ratio = original_width / original_height
-
-            if abs(original_ratio - target_ratio) < 0.01:
-                # Already matches the target aspect ratio
-                processed_img = img.copy()
-            else:
-                # Calculate canvas size that fits the image while matching target ratio
-                if original_ratio > target_ratio:
-                    # Image is wider - fit to width, add padding top/bottom
-                    canvas_width = original_width
-                    canvas_height = int(original_width / target_ratio)
-                else:
-                    # Image is taller - fit to height, add padding left/right
-                    canvas_height = original_height
-                    canvas_width = int(original_height * target_ratio)
-
-                # Create canvas with white background
-                canvas_mode = 'RGBA' if img.mode == 'RGBA' else 'RGB'
-                bg_color = (255, 255, 255, 255) if canvas_mode == 'RGBA' else (255, 255, 255)
-                processed_img = Image.new(canvas_mode, (canvas_width, canvas_height), bg_color)
-
-                # Paste original image centered
-                paste_x = (canvas_width - original_width) // 2
-                paste_y = (canvas_height - original_height) // 2
-                processed_img.paste(img, (paste_x, paste_y))
-            if ext in ['.jpg', '.jpeg']:
-                output_format = 'JPEG'
-                content_type = 'image/jpeg'
-                file_ext = 'jpg'
-            else:
-                output_format = 'PNG'
-                content_type = 'image/png'
-                file_ext = 'png'
-
-            # Save to bytes buffer
-            buffer = io.BytesIO()
-            if output_format == 'JPEG':
-                # Convert RGBA to RGB for JPEG
-                if processed_img.mode == 'RGBA':
-                    processed_img = processed_img.convert('RGB')
-                processed_img.save(buffer, format=output_format, quality=95)
-            else:
-                processed_img.save(buffer, format=output_format)
-            buffer.seek(0)
-
-            # Generate filename
-            filename = f"image_{image_id}_{aspect_ratio.replace(':', 'x')}.{file_ext}"
-
-            logger.info(f"Download image {image_id}: {original_width}x{original_height} -> {processed_img.size[0]}x{processed_img.size[1]} ({aspect_ratio})")
-
-            return StreamingResponse(
-                buffer,
-                media_type=content_type,
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"',
-                    "X-Original-Size": f"{original_width}x{original_height}",
-                    "X-Processed-Size": f"{processed_img.size[0]}x{processed_img.size[1]}",
-                    "X-Aspect-Ratio": aspect_ratio,
-                }
-            )
-
-    except Exception as e:
-        logger.error(f"Failed to process image for download: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process image: {str(e)}"
-        )
+    return StreamingResponse(
+        io.BytesIO(image_data),
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        }
+    )
 
 
 __all__ = ["router"]
