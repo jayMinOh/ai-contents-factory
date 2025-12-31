@@ -238,6 +238,9 @@ CRITICAL RULES:
                     response_modalities=["IMAGE"],
                     temperature=0.4,  # 낮은 temperature로 프롬프트에 더 충실하게
                     system_instruction=system_instruction,
+                    image_config=types.ImageConfig(
+                        aspect_ratio=aspect_ratio,
+                    ),
                 ),
             )
 
