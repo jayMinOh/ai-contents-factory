@@ -29,8 +29,8 @@ class GeminiImageEditor:
     preserving its visual identity and placing it in new contexts.
     """
 
-    # Supported aspect ratios
-    SUPPORTED_ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"]
+    # Supported aspect ratios (Gemini 3 Pro Image supports 4:5, 5:4)
+    SUPPORTED_ASPECT_RATIOS = ["1:1", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9"]
 
     def __init__(self):
         logger.info("Initializing GeminiImageEditor...")

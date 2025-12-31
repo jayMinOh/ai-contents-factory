@@ -177,7 +177,7 @@ class GeminiImagenGenerator(ImageGeneratorBase):
     """
 
     # Supported aspect ratios for Imagen 3
-    SUPPORTED_ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"]
+    SUPPORTED_ASPECT_RATIOS = ["1:1", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9"]
 
     def __init__(self):
         logger.info("Initializing GeminiImagenGenerator...")

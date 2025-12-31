@@ -72,8 +72,8 @@ class CompositeImageGenerator:
     lighting, shadows, and positioning.
     """
 
-    # Supported aspect ratios for Imagen 3
-    SUPPORTED_ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"]
+    # Supported aspect ratios (Gemini 3 Pro Image supports 4:5, 5:4)
+    SUPPORTED_ASPECT_RATIOS = ["1:1", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9"]
 
     # Composition quality instructions
     COMPOSITION_INSTRUCTIONS: Dict[str, str] = {
