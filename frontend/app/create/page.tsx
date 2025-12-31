@@ -182,7 +182,8 @@ function CreatePageContent() {
   const initialType: ContentType = typeParam === "carousel" ? "carousel" : "single";
   const [config, setConfig] = useState<ContentConfig>({
     type: initialType,
-    aspectRatio: "1:1",
+    // Carousel uses 4:5 (Instagram feed), single uses 1:1 as default
+    aspectRatio: initialType === "carousel" ? "4:5" : "1:1",
     purpose: "ad",
     // Default method: carousel uses reference, single use prompt
     method: initialType === "carousel" ? "reference" : "prompt",
@@ -1298,9 +1299,11 @@ function CreatePageContent() {
                 <button
                   key={item.type}
                   onClick={() => {
-                    // Set method based on content type: carousel uses reference, single uses prompt
+                    // Set method and aspect ratio based on content type
                     const defaultMethod = item.type === "carousel" ? "reference" : "prompt";
-                    setConfig((prev) => ({ ...prev, type: item.type, method: defaultMethod }));
+                    // Carousel uses 4:5 (Instagram feed), single uses 1:1 as default
+                    const defaultAspectRatio = item.type === "carousel" ? "4:5" : "1:1";
+                    setConfig((prev) => ({ ...prev, type: item.type, method: defaultMethod, aspectRatio: defaultAspectRatio as AspectRatio }));
                     // Carousel goes directly to next step
                     if (item.type === "carousel") {
                       handleNext();
