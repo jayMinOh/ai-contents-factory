@@ -1480,23 +1480,33 @@ async def download_image(
         with img:
             original_width, original_height = img.size
 
-            # Calculate target dimensions maintaining aspect ratio
+            # Calculate target dimensions - fit image into target ratio without cropping
             target_ratio = target_width_ratio / target_height_ratio
             original_ratio = original_width / original_height
 
             if abs(original_ratio - target_ratio) < 0.01:
                 # Already matches the target aspect ratio
                 processed_img = img.copy()
-            elif original_ratio > target_ratio:
-                # Image is wider than target - crop width
-                new_width = int(original_height * target_ratio)
-                left = (original_width - new_width) // 2
-                processed_img = img.crop((left, 0, left + new_width, original_height))
             else:
-                # Image is taller than target - crop height
-                new_height = int(original_width / target_ratio)
-                top = (original_height - new_height) // 2
-                processed_img = img.crop((0, top, original_width, top + new_height))
+                # Calculate canvas size that fits the image while matching target ratio
+                if original_ratio > target_ratio:
+                    # Image is wider - fit to width, add padding top/bottom
+                    canvas_width = original_width
+                    canvas_height = int(original_width / target_ratio)
+                else:
+                    # Image is taller - fit to height, add padding left/right
+                    canvas_height = original_height
+                    canvas_width = int(original_height * target_ratio)
+
+                # Create canvas with white background
+                canvas_mode = 'RGBA' if img.mode == 'RGBA' else 'RGB'
+                bg_color = (255, 255, 255, 255) if canvas_mode == 'RGBA' else (255, 255, 255)
+                processed_img = Image.new(canvas_mode, (canvas_width, canvas_height), bg_color)
+
+                # Paste original image centered
+                paste_x = (canvas_width - original_width) // 2
+                paste_y = (canvas_height - original_height) // 2
+                processed_img.paste(img, (paste_x, paste_y))
             if ext in ['.jpg', '.jpeg']:
                 output_format = 'JPEG'
                 content_type = 'image/jpeg'

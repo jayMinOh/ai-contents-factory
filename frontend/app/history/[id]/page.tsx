@@ -166,6 +166,7 @@ export default function HistoryDetailPage() {
   const [selectedSlide, setSelectedSlide] = useState<number>(1);
   const [lang, setLang] = useState<Lang>("ko");
   const [isRetrying, setIsRetrying] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Detect browser language
   useEffect(() => {
@@ -586,15 +587,13 @@ export default function HistoryDetailPage() {
                         >
                           <Download className="w-5 h-5 text-white" />
                         </button>
-                        <a
-                          href={image.image_url.startsWith('http') ? image.image_url : `http://localhost:8000${image.image_url}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() => setLightboxImage(image.image_url.startsWith('http') ? image.image_url : `http://localhost:8000${image.image_url}`)}
                           className="p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
-                          title="Open in new tab"
+                          title="View full size"
                         >
                           <ExternalLink className="w-5 h-5 text-white" />
-                        </a>
+                        </button>
                       </div>
 
                       {/* Variant Badge */}
@@ -695,6 +694,27 @@ export default function HistoryDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Lightbox Modal */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl font-light"
+            onClick={() => setLightboxImage(null)}
+          >
+            ×
+          </button>
+          <img
+            src={lightboxImage}
+            alt="Full size preview"
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
