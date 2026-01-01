@@ -7,6 +7,7 @@ Analyzes product images to generate detailed descriptions for AI image generatio
 import asyncio
 import base64
 import logging
+import re
 from typing import Optional
 
 from google import genai
@@ -232,11 +233,32 @@ IMPORTANT: For product images, the visual_prompt should be detailed enough that 
             return result
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse JSON response: {e}. Response: {response_text[:200]}")
-            # Return fallback response
+            # Try to extract values using regex from truncated JSON
+            detected_type = "unknown"
+            is_realistic = True
+            description = ""
+
+            # Extract detected_type
+            type_match = re.search(r'"detected_type"\s*:\s*"(\w+)"', response_text)
+            if type_match:
+                detected_type = type_match.group(1)
+
+            # Extract is_realistic
+            realistic_match = re.search(r'"is_realistic"\s*:\s*(true|false)', response_text, re.IGNORECASE)
+            if realistic_match:
+                is_realistic = realistic_match.group(1).lower() == "true"
+
+            # Extract description (partial)
+            desc_match = re.search(r'"description"\s*:\s*"([^"]*)', response_text)
+            if desc_match:
+                description = desc_match.group(1)[:500]  # Limit to 500 chars
+
+            logger.info(f"Extracted from truncated JSON: type={detected_type}, is_realistic={is_realistic}")
+
             return {
-                "detected_type": "unknown",
-                "is_realistic": True,
-                "description": response_text[:200] if response_text else "이미지 분석 결과를 파싱할 수 없습니다.",
+                "detected_type": detected_type,
+                "is_realistic": is_realistic,
+                "description": description or "이미지 분석 결과를 파싱할 수 없습니다.",
                 "elements": [],
                 "visual_prompt": "",
             }
