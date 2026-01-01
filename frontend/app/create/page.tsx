@@ -34,7 +34,7 @@ import {
   ImagePlus,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { brandApi, referenceApi, storyboardApi, imageProjectApi, AnalysisResult, HookPoint, EdgePoint, EmotionalTrigger, SellingPoint, Recommendation, ContentStoryboard, StoryboardSlide, ImageProject, GeneratedImage, GenerateSingleSectionResponse, ConceptSuggestion } from "@/lib/api";
+import { brandApi, referenceApi, storyboardApi, imageProjectApi, studioApi, AnalysisResult, HookPoint, EdgePoint, EmotionalTrigger, SellingPoint, Recommendation, ContentStoryboard, StoryboardSlide, ImageProject, GeneratedImage, GenerateSingleSectionResponse, ConceptSuggestion } from "@/lib/api";
 import { toast } from "sonner";
 
 // FadeInImage Component - Grok-style progressive loading effect
@@ -87,7 +87,7 @@ function FadeInImage({ src, alt, className = "", onError, onClick }: FadeInImage
 }
 
 // Content types
-type ContentType = "single" | "carousel";
+type ContentType = "single" | "carousel" | "compose";
 type AspectRatio = "1:1" | "4:5" | "9:16";
 type Purpose = "ad" | "info" | "lifestyle";
 type GenerationMethod = "reference" | "prompt";
@@ -141,6 +141,13 @@ const contentTypes = [
     desc: "2~10장으로 구성된 슬라이드형 콘텐츠",
     gradient: "from-electric-500 to-electric-600",
   },
+  {
+    type: "compose" as const,
+    icon: ImagePlus,
+    label: "이미지 합성/편집",
+    desc: "업로드한 이미지를 AI로 합성/편집",
+    gradient: "from-glow-500 to-glow-600",
+  },
 ];
 
 const aspectRatios = [
@@ -179,13 +186,13 @@ function CreatePageContent() {
 
   const [step, setStep] = useState(1);
   const typeParam = searchParams.get("type");
-  const initialType: ContentType = typeParam === "carousel" ? "carousel" : "single";
+  const initialType: ContentType = typeParam === "carousel" ? "carousel" : typeParam === "compose" ? "compose" : "single";
   const [config, setConfig] = useState<ContentConfig>({
     type: initialType,
-    // Carousel uses 4:5 (Instagram feed), single uses 1:1 as default
+    // Carousel uses 4:5 (Instagram feed), compose and single use 1:1 as default
     aspectRatio: initialType === "carousel" ? "4:5" : "1:1",
     purpose: "ad",
-    // Default method: carousel uses reference, single use prompt
+    // Default method: carousel uses reference, compose and single use prompt
     method: initialType === "carousel" ? "reference" : "prompt",
     // Style reference: default off for ad (product is fixed), on for lifestyle
     useStyleReference: false,
@@ -203,6 +210,29 @@ function CreatePageContent() {
   // Concept suggestion state for single/story with reference method
   const [conceptSuggestion, setConceptSuggestion] = useState<ConceptSuggestion | null>(null);
   const [isGeneratingConcept, setIsGeneratingConcept] = useState(false);
+
+  // Compose mode state - for image composition/editing
+  const [enhancedPrompt, setEnhancedPrompt] = useState<{
+    original_prompt: string;
+    enhanced_prompt: string;
+    enhanced_prompt_display: string;
+    composition_suggestion?: string;
+    detected_intent?: string;
+  } | null>(null);
+  const [isEnhancingPrompt, setIsEnhancingPrompt] = useState(false);
+  const [composeUploadedImages, setComposeUploadedImages] = useState<Array<{
+    file: File;
+    previewUrl: string;
+    tempId?: string;
+    detectedType?: string;
+    isRealistic?: boolean;
+    description?: string;
+    visualPrompt?: string;
+    isAnalyzing?: boolean;
+  }>>([]);
+  const [composePrompt, setComposePrompt] = useState("");
+  const [composeGeneratedImage, setComposeGeneratedImage] = useState<string | null>(null);
+  const [isGeneratingCompose, setIsGeneratingCompose] = useState(false);
 
   // Section-based image generation state for carousel/story
   const [sectionImages, setSectionImages] = useState<Record<number, string[]>>({});
@@ -475,11 +505,25 @@ function CreatePageContent() {
   }, [step, config.type, config.method, config.referenceId, config.uploadedReferenceImages, config.prompt]);
 
   const handleNext = () => {
-    if (step < 6) setStep(step + 1);
+    if (step < 6) {
+      // compose 타입은 용도(step 2) 스킵
+      if (config.type === "compose" && step === 1) {
+        setStep(3); // 유형 → 방식으로 직행
+      } else {
+        setStep(step + 1);
+      }
+    }
   };
 
   const handleBack = () => {
-    if (step > 1) setStep(step - 1);
+    if (step > 1) {
+      // compose 타입은 용도(step 2) 스킵
+      if (config.type === "compose" && step === 3) {
+        setStep(1); // 방식 → 유형으로 직행
+      } else {
+        setStep(step - 1);
+      }
+    }
   };
 
   const handleGenerateStoryboard = async () => {
@@ -487,8 +531,9 @@ function CreatePageContent() {
     toast.info("AI가 스토리보드를 생성하고 있습니다...");
 
     try {
+      // Note: compose type doesn't use storyboard, so we cast to valid types
       const requestData = {
-        content_type: config.type,
+        content_type: config.type as "single" | "carousel" | "story",
         purpose: config.purpose,
         method: config.method,
         prompt: config.prompt,
@@ -514,6 +559,142 @@ function CreatePageContent() {
       setIsGeneratingStoryboard(false);
     }
   };
+
+  // ========== Compose Mode Handlers ==========
+
+  // Handle image upload for compose mode
+  const handleComposeImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newImages = Array.from(files).map((file) => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+      isAnalyzing: true,
+    }));
+
+    setComposeUploadedImages((prev) => [...prev, ...newImages]);
+
+    // Analyze each image
+    for (let i = 0; i < newImages.length; i++) {
+      const file = files[i];
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const result = await studioApi.analyzeMarketingImage(formData);
+
+        setComposeUploadedImages((prev) =>
+          prev.map((img) =>
+            img.file === file
+              ? {
+                  ...img,
+                  tempId: result.temp_id,
+                  detectedType: result.detected_type,
+                  isRealistic: result.is_realistic,
+                  description: result.description,
+                  visualPrompt: result.visual_prompt,
+                  isAnalyzing: false,
+                }
+              : img
+          )
+        );
+      } catch (error) {
+        console.error("Image analysis failed:", error);
+        setComposeUploadedImages((prev) =>
+          prev.map((img) =>
+            img.file === file ? { ...img, isAnalyzing: false, detectedType: "unknown" } : img
+          )
+        );
+        toast.error(`이미지 분석 실패: ${file.name}`);
+      }
+    }
+  };
+
+  // Remove uploaded image for compose mode
+  const handleRemoveComposeImage = (index: number) => {
+    setComposeUploadedImages((prev) => {
+      const newImages = [...prev];
+      URL.revokeObjectURL(newImages[index].previewUrl);
+      newImages.splice(index, 1);
+      return newImages;
+    });
+  };
+
+  // Enhance prompt for compose mode
+  const handleEnhancePrompt = async () => {
+    if (!composePrompt.trim()) {
+      toast.error("프롬프트를 입력해주세요.");
+      return;
+    }
+
+    if (composeUploadedImages.length === 0) {
+      toast.error("이미지를 먼저 업로드해주세요.");
+      return;
+    }
+
+    // Check if all images are analyzed
+    const pendingAnalysis = composeUploadedImages.some((img) => img.isAnalyzing);
+    if (pendingAnalysis) {
+      toast.error("이미지 분석이 완료될 때까지 기다려주세요.");
+      return;
+    }
+
+    setIsEnhancingPrompt(true);
+    toast.info("AI가 프롬프트를 구체화하고 있습니다...");
+
+    try {
+      const result = await studioApi.enhancePrompt({
+        user_prompt: composePrompt,
+        images: composeUploadedImages.map((img) => ({
+          temp_id: img.tempId || "",
+          detected_type: img.detectedType || "unknown",
+          is_realistic: img.isRealistic ?? true,
+          description: img.description,
+          visual_prompt: img.visualPrompt,
+        })),
+        aspect_ratio: config.aspectRatio,
+        language: "ko",
+      });
+
+      setEnhancedPrompt(result);
+      toast.success("프롬프트 구체화가 완료되었습니다!");
+      setStep(4); // Move to confirmation step
+    } catch (error) {
+      console.error("Prompt enhancement failed:", error);
+      toast.error("프롬프트 구체화에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsEnhancingPrompt(false);
+    }
+  };
+
+  // Generate composed image
+  const handleGenerateComposeImage = async () => {
+    if (!enhancedPrompt) {
+      toast.error("먼저 프롬프트를 구체화해주세요.");
+      return;
+    }
+
+    setIsGeneratingCompose(true);
+    toast.info("AI가 이미지를 생성하고 있습니다...");
+
+    try {
+      const result = await studioApi.editImageWithProduct({
+        image_temp_ids: composeUploadedImages.map((img) => img.tempId || "").filter(Boolean),
+        prompt: enhancedPrompt.enhanced_prompt,
+        aspect_ratio: config.aspectRatio,
+      });
+
+      setComposeGeneratedImage(result.image_url);
+      toast.success("이미지 생성이 완료되었습니다!");
+    } catch (error) {
+      console.error("Image generation failed:", error);
+      toast.error("이미지 생성에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsGeneratingCompose(false);
+    }
+  };
+
+  // ========== End Compose Mode Handlers ==========
 
   // Generate AI concept suggestion for single/story (supports both reference and upload modes)
   const handleGenerateConcept = async () => {
@@ -729,8 +910,9 @@ function CreatePageContent() {
       }
 
       // Create image project with storyboard data and reference images
+      // Note: compose type doesn't use imageProjectApi, so we cast to valid types
       const project = await imageProjectApi.create({
-        content_type: config.type,
+        content_type: config.type as "single" | "carousel" | "story",
         purpose: config.purpose,
         method: config.method,
         generation_mode: "bulk",
@@ -770,7 +952,7 @@ function CreatePageContent() {
     try {
       // Create image project (Single/Story mode - uses step_by_step for 2 variants)
       const project = await imageProjectApi.create({
-        content_type: config.type,
+        content_type: config.type as "single" | "carousel" | "story",
         purpose: config.purpose,
         method: config.method,
         generation_mode: "step_by_step",
@@ -823,7 +1005,7 @@ function CreatePageContent() {
 
           // Create image project with storyboard data
           const project = await imageProjectApi.create({
-            content_type: config.type,
+            content_type: config.type as "single" | "carousel" | "story",
             purpose: config.purpose,
             method: config.method,
             generation_mode: "bulk",
@@ -860,7 +1042,7 @@ function CreatePageContent() {
     try {
       // Create image project first (Bulk mode)
       const project = await imageProjectApi.create({
-        content_type: config.type,
+        content_type: config.type as "single" | "carousel" | "story",
         purpose: config.purpose,
         method: config.method,
         generation_mode: "bulk",
@@ -920,7 +1102,7 @@ function CreatePageContent() {
       // Create image project if not exists (Step-by-step mode)
       if (!projectId) {
         const project = await imageProjectApi.create({
-          content_type: config.type,
+          content_type: config.type as "single" | "carousel" | "story",
           purpose: config.purpose,
           method: config.method,
           generation_mode: "step_by_step",
@@ -1189,7 +1371,7 @@ function CreatePageContent() {
     try {
       // Create image project (Single/Story mode - uses step_by_step for 2 variants)
       const project = await imageProjectApi.create({
-        content_type: config.type,
+        content_type: config.type as "single" | "carousel" | "story",
         purpose: config.purpose,
         method: config.method,
         generation_mode: "step_by_step",
@@ -1512,6 +1694,155 @@ function CreatePageContent() {
                     <p className="text-sm text-muted leading-relaxed">
                       프롬프트로 원하는 이미지를 직접 설명해서 생성합니다.
                     </p>
+                  </button>
+                </div>
+              </>
+            ) : config.type === "compose" ? (
+              /* Compose: Show image upload + prompt for composition/editing */
+              <>
+                <div className="text-center">
+                  <h2 className="font-display text-2xl font-bold text-foreground mb-2">
+                    이미지 합성/편집
+                  </h2>
+                  <p className="text-muted">이미지를 업로드하고 원하는 결과를 설명해주세요</p>
+                </div>
+
+                {/* Aspect Ratio Selection for Compose */}
+                <div className="p-6 rounded-2xl bg-muted/30 dark:bg-muted/10 border border-default">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center">
+                      <Layers className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">출력 비율</p>
+                      <p className="text-xs text-muted">생성될 이미지의 비율을 선택하세요</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {aspectRatios.map((ar) => (
+                      <button
+                        key={ar.ratio}
+                        onClick={() => setConfig((prev) => ({ ...prev, aspectRatio: ar.ratio }))}
+                        className={`p-3 rounded-xl border-2 transition-all ${
+                          config.aspectRatio === ar.ratio
+                            ? "border-accent-500 bg-accent-500/10"
+                            : "border-default hover:border-muted"
+                        }`}
+                      >
+                        <p className="font-semibold text-foreground">{ar.label}</p>
+                        <p className="text-xs text-muted">{ar.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Image Upload for Compose */}
+                <div className="p-6 rounded-2xl bg-muted/30 dark:bg-muted/10 border border-default">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-electric-500 to-electric-600 flex items-center justify-center">
+                      <ImagePlus className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">이미지 업로드 <span className="text-red-500">*</span></p>
+                      <p className="text-xs text-muted">합성/편집할 이미지를 업로드하세요 (제품, 배경 등)</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    {/* Uploaded Images with Analysis Info */}
+                    {composeUploadedImages.map((img, index) => (
+                      <div key={index} className="relative w-32">
+                        <div className="relative w-32 h-32 rounded-xl overflow-hidden border-2 border-default">
+                          <img
+                            src={img.previewUrl}
+                            alt={`업로드 이미지 ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          {img.isAnalyzing && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                              <Loader2 className="w-6 h-6 text-white animate-spin" />
+                            </div>
+                          )}
+                          <button
+                            onClick={() => handleRemoveComposeImage(index)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors shadow-lg z-10"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {/* Analysis Result Badge */}
+                        {!img.isAnalyzing && img.detectedType && (
+                          <div className="mt-1.5 text-center">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                              img.detectedType === "product"
+                                ? "bg-accent-500/20 text-accent-500"
+                                : img.detectedType === "background"
+                                ? "bg-electric-500/20 text-electric-500"
+                                : "bg-muted text-muted-foreground"
+                            }`}>
+                              {img.detectedType === "product" ? "제품" : img.detectedType === "background" ? "배경" : img.detectedType === "reference" ? "레퍼런스" : "기타"}
+                              {img.isRealistic === false && " (일러스트)"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Upload Button */}
+                    <label className="block cursor-pointer">
+                      <div className="w-32 h-32 border-2 border-dashed border-muted hover:border-electric-500 rounded-xl flex flex-col items-center justify-center transition-colors">
+                        <Upload className="w-6 h-6 text-muted mb-1" />
+                        <p className="text-xs text-muted">이미지 추가</p>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleComposeImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Prompt Input for Compose */}
+                <div className="p-6 rounded-2xl bg-muted/30 dark:bg-muted/10 border border-default">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-glow-500 to-glow-600 flex items-center justify-center">
+                      <Edit3 className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">프롬프트 <span className="text-red-500">*</span></p>
+                      <p className="text-xs text-muted">원하는 결과를 설명해주세요 (AI가 구체화해줍니다)</p>
+                    </div>
+                  </div>
+                  <textarea
+                    value={composePrompt}
+                    onChange={(e) => setComposePrompt(e.target.value)}
+                    placeholder="예: 화장품을 대리석 배경 위에 고급스럽게 배치해줘 / 제품을 손에 들고 있는 모습으로 합성해줘"
+                    className="w-full px-4 py-3 bg-background border border-default rounded-xl text-foreground placeholder:text-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                {/* Enhance Prompt Button */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={handleEnhancePrompt}
+                    disabled={isEnhancingPrompt || composeUploadedImages.length === 0 || !composePrompt.trim()}
+                    className="btn-primary px-8 py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isEnhancingPrompt ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        프롬프트 구체화 중...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-5 h-5" />
+                        프롬프트 구체화하기
+                      </>
+                    )}
                   </button>
                 </div>
               </>
@@ -2235,6 +2566,176 @@ function CreatePageContent() {
         {/* Step 4: Generate - Branches based on content type */}
         {step === 4 && (
           <div className="space-y-8">
+            {/* Compose Mode: Enhanced Prompt Confirmation & Image Generation */}
+            {config.type === "compose" && (
+              <>
+                <div className="text-center">
+                  <h2 className="font-display text-2xl font-bold text-foreground mb-2">
+                    프롬프트 확인 및 이미지 생성
+                  </h2>
+                  <p className="text-muted">AI가 구체화한 프롬프트를 확인하고 이미지를 생성하세요</p>
+                </div>
+
+                {/* Uploaded Images Preview */}
+                <div className="p-4 rounded-2xl bg-muted/30 dark:bg-muted/10 border border-default">
+                  <p className="text-sm font-medium text-foreground mb-3">업로드한 이미지</p>
+                  <div className="flex flex-wrap gap-3">
+                    {composeUploadedImages.map((img, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={img.previewUrl}
+                          alt={`업로드 이미지 ${index + 1}`}
+                          className="w-20 h-20 object-cover rounded-xl"
+                        />
+                        <span className={`absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                          img.detectedType === "product"
+                            ? "bg-accent-500 text-white"
+                            : img.detectedType === "background"
+                            ? "bg-electric-500 text-white"
+                            : "bg-muted text-foreground"
+                        }`}>
+                          {img.detectedType === "product" ? "제품" : img.detectedType === "background" ? "배경" : "기타"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Enhanced Prompt Display */}
+                {enhancedPrompt && (
+                  <div className="space-y-4">
+                    {/* Original vs Enhanced */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-xl bg-muted/30 border border-default">
+                        <p className="text-xs text-muted mb-2">원본 프롬프트</p>
+                        <p className="text-sm text-foreground">{enhancedPrompt.original_prompt}</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-accent-500/10 border border-accent-500/30">
+                        <p className="text-xs text-accent-500 mb-2 flex items-center gap-1">
+                          <Wand2 className="w-3 h-3" /> AI 구체화 프롬프트
+                        </p>
+                        <p className="text-sm text-foreground">{enhancedPrompt.enhanced_prompt_display}</p>
+                      </div>
+                    </div>
+
+                    {/* Composition Suggestion */}
+                    {enhancedPrompt.composition_suggestion && (
+                      <div className="p-4 rounded-xl bg-electric-500/10 border border-electric-500/30">
+                        <p className="text-xs text-electric-500 mb-2 flex items-center gap-1">
+                          <Lightbulb className="w-3 h-3" /> AI 구성 제안
+                        </p>
+                        <p className="text-sm text-foreground">{enhancedPrompt.composition_suggestion}</p>
+                      </div>
+                    )}
+
+                    {/* Detected Intent Badge */}
+                    {enhancedPrompt.detected_intent && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted">감지된 의도:</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          enhancedPrompt.detected_intent === "composite"
+                            ? "bg-glow-500/20 text-glow-500"
+                            : enhancedPrompt.detected_intent === "edit"
+                            ? "bg-accent-500/20 text-accent-500"
+                            : "bg-electric-500/20 text-electric-500"
+                        }`}>
+                          {enhancedPrompt.detected_intent === "composite" ? "이미지 합성"
+                            : enhancedPrompt.detected_intent === "edit" ? "이미지 편집"
+                            : enhancedPrompt.detected_intent === "style_transfer" ? "스타일 적용"
+                            : "이미지 생성"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Generate Button */}
+                {!composeGeneratedImage && (
+                  <div className="flex justify-center gap-4">
+                    <button
+                      onClick={() => {
+                        setEnhancedPrompt(null);
+                        setStep(3);
+                      }}
+                      className="btn-secondary px-6 py-3"
+                    >
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      다시 수정
+                    </button>
+                    <button
+                      onClick={handleGenerateComposeImage}
+                      disabled={isGeneratingCompose || !enhancedPrompt}
+                      className="btn-primary px-8 py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {isGeneratingCompose ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          이미지 생성 중...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-5 h-5" />
+                          이미지 생성하기
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Generated Image Result */}
+                {composeGeneratedImage && (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-muted/30 dark:bg-muted/10 border border-default">
+                      <p className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-500" />
+                        생성 완료
+                      </p>
+                      <div className="relative aspect-square max-w-md mx-auto rounded-xl overflow-hidden">
+                        <FadeInImage
+                          src={composeGeneratedImage}
+                          alt="생성된 이미지"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-center gap-4">
+                      <button
+                        onClick={() => {
+                          setComposeGeneratedImage(null);
+                        }}
+                        className="btn-secondary px-6 py-3"
+                      >
+                        <RefreshCw className="w-4 h-4 mr-1" />
+                        다시 생성
+                      </button>
+                      <a
+                        href={composeGeneratedImage}
+                        download="generated-image.png"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-primary px-6 py-3"
+                      >
+                        다운로드
+                      </a>
+                      <Link
+                        href={`/create/edit?type=${config.type}`}
+                        onClick={() => {
+                          sessionStorage.setItem("selectedImage", JSON.stringify({
+                            imageUrl: composeGeneratedImage,
+                            imageIndex: 0,
+                          }));
+                        }}
+                        className="btn-primary px-6 py-3"
+                      >
+                        텍스트 편집
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             {/* Single Image or Story: Concept Suggestion (both upload and reference modes) */}
             {(config.type === "single") && (
               <>

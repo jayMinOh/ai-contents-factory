@@ -251,6 +251,39 @@ class ProductSceneComposeRequest(BaseModel):
     product_description: Optional[str] = Field(None, description="Optional text description of the product")
 
 
+# ========== Prompt Enhancement Schemas ==========
+
+
+class ImageContext(BaseModel):
+    """Context information for an uploaded image."""
+    temp_id: str = Field(..., description="Temp ID of the uploaded image")
+    detected_type: str = Field(..., description="Detected type: product, background, reference, person")
+    is_realistic: bool = Field(default=True, description="Whether the image is realistic (photo) or illustration")
+    description: Optional[str] = Field(None, description="AI-generated description of the image")
+    visual_prompt: Optional[str] = Field(None, description="Visual prompt extracted from image analysis")
+
+
+class PromptEnhanceRequest(BaseModel):
+    """Request to enhance a user prompt for image generation.
+
+    Takes a simple user prompt and image context, then returns
+    a detailed, optimized prompt for Gemini image generation.
+    """
+    user_prompt: str = Field(..., min_length=1, description="User's original simple prompt")
+    images: List[ImageContext] = Field(default_factory=list, description="List of uploaded image contexts")
+    aspect_ratio: Optional[str] = Field(default="1:1", pattern=r"^\d+:\d+$", description="Target aspect ratio")
+    language: Optional[str] = Field(default="ko", description="Output language code (ko, en, ja, zh)")
+
+
+class PromptEnhanceResponse(BaseModel):
+    """Response containing the enhanced prompt."""
+    original_prompt: str = Field(..., description="The original user prompt")
+    enhanced_prompt: str = Field(..., description="Enhanced prompt optimized for AI image generation (English)")
+    enhanced_prompt_display: str = Field(..., description="Enhanced prompt in user's language for display")
+    composition_suggestion: Optional[str] = Field(None, description="Suggested composition based on image types")
+    detected_intent: Optional[str] = Field(None, description="Detected user intent: composite, edit, style_transfer, generate")
+
+
 # ========== Per-Scene Video Generation Schemas ==========
 
 
@@ -433,6 +466,10 @@ __all__ = [
     "MarketingImageGenerateRequest",
     "ProductImageEditRequest",
     "ProductSceneComposeRequest",
+    # Prompt Enhancement Schemas
+    "ImageContext",
+    "PromptEnhanceRequest",
+    "PromptEnhanceResponse",
     # Per-Scene Video Generation Schemas
     "SceneVideoStatus",
     "SceneVideoResponse",

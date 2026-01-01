@@ -28,6 +28,8 @@ from app.schemas.studio import (
     MarketingImageGenerateRequest,
     ProductImageEditRequest,
     ProductSceneComposeRequest,
+    PromptEnhanceRequest,
+    PromptEnhanceResponse,
     SceneCreateRequest,
     SceneImageCreate,
     SceneImageGenerate,
@@ -1263,6 +1265,64 @@ async def analyze_marketing_image(
             "elements": [],
             "visual_prompt": "",
         }
+
+
+@router.post("/images/enhance-prompt", response_model=PromptEnhanceResponse)
+async def enhance_prompt_for_generation(
+    request: PromptEnhanceRequest,
+):
+    """
+    Enhance a simple user prompt into a detailed, optimized prompt for AI image generation.
+
+    This endpoint takes a user's simple description and uploaded image contexts,
+    then generates a professional prompt that Gemini/Nano Banana Pro can better understand.
+
+    Example:
+        Input: "화장품을 예쁘게 배치해줘"
+        Output: "Professional product photography of a skincare bottle on a marble surface
+                 with soft natural lighting, elegant composition, minimalist aesthetic..."
+
+    The enhanced prompt is returned both in English (for optimal AI generation)
+    and in the user's preferred language (for display).
+    """
+    from app.services.prompt_enhancer import get_prompt_enhancer
+
+    logger.info(f"=== enhance_prompt_for_generation called ===")
+    logger.info(f"user_prompt: {request.user_prompt[:100]}...")
+    logger.info(f"images: {len(request.images)}")
+    logger.info(f"aspect_ratio: {request.aspect_ratio}")
+    logger.info(f"language: {request.language}")
+
+    try:
+        enhancer = get_prompt_enhancer()
+
+        # Convert Pydantic models to dicts
+        images_data = [img.model_dump() for img in request.images] if request.images else []
+
+        result = await enhancer.enhance(
+            user_prompt=request.user_prompt,
+            images=images_data,
+            aspect_ratio=request.aspect_ratio or "1:1",
+            language=request.language or "ko",
+        )
+
+        logger.info(f"Prompt enhanced successfully: intent={result.get('detected_intent')}")
+
+        return PromptEnhanceResponse(
+            original_prompt=result["original_prompt"],
+            enhanced_prompt=result["enhanced_prompt"],
+            enhanced_prompt_display=result["enhanced_prompt_display"],
+            composition_suggestion=result.get("composition_suggestion"),
+            detected_intent=result.get("detected_intent"),
+        )
+
+    except Exception as e:
+        logger.error(f"Prompt enhancement failed: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Prompt enhancement failed: {str(e)}"
+        )
 
 
 @router.post("/images/generate")

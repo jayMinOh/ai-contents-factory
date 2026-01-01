@@ -785,6 +785,32 @@ export const studioApi = {
     return response.data;
   },
 
+  /**
+   * Enhance a simple user prompt into a detailed, optimized prompt for AI image generation.
+   * Takes image contexts and returns a professional prompt.
+   */
+  enhancePrompt: async (data: {
+    user_prompt: string;
+    images?: Array<{
+      temp_id: string;
+      detected_type: string;
+      is_realistic?: boolean;
+      description?: string;
+      visual_prompt?: string;
+    }>;
+    aspect_ratio?: string;
+    language?: string;
+  }): Promise<{
+    original_prompt: string;
+    enhanced_prompt: string;
+    enhanced_prompt_display: string;
+    composition_suggestion?: string;
+    detected_intent?: string;
+  }> => {
+    const response = await api.post("/studio/images/enhance-prompt", data);
+    return response.data;
+  },
+
   generateMarketingImage: async (data: {
     images: Array<{
       temp_url: string;
