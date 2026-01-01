@@ -1476,7 +1476,7 @@ function CreatePageContent() {
               <p className="text-muted">콘텐츠 유형을 선택하세요</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
               {contentTypes.map((item) => (
                 <button
                   key={item.type}
@@ -1506,8 +1506,8 @@ function CreatePageContent() {
               ))}
             </div>
 
-            {/* Aspect Ratio Selection for Single Image */}
-            {config.type === "single" && (
+            {/* Aspect Ratio Selection for Single Image and Compose */}
+            {(config.type === "single" || config.type === "compose") && (
               <div className="space-y-4">
                 <div className="text-center">
                   <h3 className="font-semibold text-foreground mb-1">비율 선택</h3>
