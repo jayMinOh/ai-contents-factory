@@ -145,7 +145,7 @@ const contentTypes = [
   },
   {
     type: "compose" as const,
-    icon: ImagePlus,
+    icon: Wand2,
     label: "이미지 합성/편집",
     desc: "업로드한 이미지를 AI로 합성/편집",
     gradient: "from-glow-500 to-glow-600",

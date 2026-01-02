@@ -41,8 +41,8 @@ const contentTypes = [
     icon: Wand2,
     label: "이미지 합성/편집",
     desc: "배경 합성, 이미지 편집",
-    color: "purple",
-    gradient: "from-purple-500 to-purple-600",
+    color: "glow",
+    gradient: "from-glow-500 to-glow-600",
   },
 ];
 
