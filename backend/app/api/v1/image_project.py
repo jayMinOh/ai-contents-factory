@@ -1113,12 +1113,24 @@ async def _run_compose_generation(project, db, settings):
             aspect_ratio=project.aspect_ratio,
         )
 
-        if gen_result and gen_result.image_url:
+        if gen_result and gen_result.get("image_data"):
+            # Upload image to COS
+            from app.services.cloud_storage import get_cloud_storage
+            cloud_storage = get_cloud_storage()
+
+            image_data = gen_result["image_data"]
+            mime_type = gen_result.get("mime_type", "image/png")
+            ext = "png" if "png" in mime_type else "jpg"
+            filename = f"{project.id}_compose.{ext}"
+
+            image_url = cloud_storage.upload_bytes(image_data, filename, "generated", mime_type)
+            logger.info(f"Compose image uploaded: {image_url}")
+
             # Create generated image record
             generated_image = GeneratedImage(
                 id=str(uuid.uuid4()),
                 image_project_id=project.id,
-                image_url=gen_result.image_url,
+                image_url=image_url,
                 prompt=project.prompt,
                 slide_number=1,
                 variant_index=0,
