@@ -1062,22 +1062,35 @@ async def _run_compose_generation(project, db, settings):
     Uses uploaded images and enhanced prompt to generate composed image.
     """
     from app.services.image_editor import get_image_editor
-    from app.services.temp_image_store import get_temp_image_store
+    import httpx
+    import os
 
     logger.info(f"Starting compose generation for project {project.id}")
 
-    try:
-        # Get temp image store
-        temp_store = get_temp_image_store()
+    async def load_image_from_temp_id(temp_id: str) -> tuple:
+        """Load image from COS by temp_id."""
+        # Try to load from COS (temp_id is UUID, file is in COS temp folder)
+        for ext in ["png", "jpg", "jpeg", "webp"]:
+            cos_url = f"https://{settings.TENCENT_COS_BUCKET}.cos.{settings.TENCENT_COS_REGION}.myqcloud.com/temp/{temp_id}.{ext}"
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(cos_url)
+                    if resp.status_code == 200:
+                        mime_type = f"image/{ext}" if ext != "jpg" else "image/jpeg"
+                        return (resp.content, mime_type)
+            except Exception:
+                continue
+        return (None, None)
 
-        # Load images from temp store
+    try:
+        # Load images from COS
         compose_images = []
         if project.compose_image_temp_ids:
             for temp_id in project.compose_image_temp_ids:
-                img_data = await temp_store.get_image(temp_id)
+                img_data, mime_type = await load_image_from_temp_id(temp_id)
                 if img_data:
-                    compose_images.append(img_data)
-                    logger.info(f"Loaded compose image: {temp_id}")
+                    compose_images.append((img_data, mime_type))
+                    logger.info(f"Loaded compose image: {temp_id}, {len(img_data)} bytes")
                 else:
                     logger.warning(f"Compose image not found: {temp_id}")
 

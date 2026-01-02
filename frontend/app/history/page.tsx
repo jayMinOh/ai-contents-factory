@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Trash2,
   Play,
+  Wand2,
 } from "lucide-react";
 import { imageProjectApi, ImageProject } from "@/lib/api";
 import { toast } from "sonner";
@@ -31,12 +32,14 @@ const contentTypeConfig = {
   single: { label: "단일 이미지", icon: ImageIcon, gradient: "from-accent-500 to-accent-600" },
   carousel: { label: "캐러셀", icon: Layers, gradient: "from-violet-500 to-purple-600" },
   story: { label: "세로형", icon: Smartphone, gradient: "from-cyan-500 to-blue-600" },
+  compose: { label: "이미지 합성", icon: Wand2, gradient: "from-glow-500 to-glow-600" },
 };
 
 const purposeConfig = {
   ad: { label: "광고/홍보", icon: Megaphone },
   info: { label: "정보성", icon: BookOpen },
   lifestyle: { label: "일상/감성", icon: Sparkles },
+  compose: { label: "합성/편집", icon: Wand2 },
 };
 
 const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
