@@ -1,7 +1,7 @@
 """Add compose fields to image_projects table.
 
 Revision ID: 006_compose_fields
-Revises: 005_add_users_table
+Revises: 005_add_users
 Create Date: 2026-01-02
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "006_compose_fields"
-down_revision = "005_add_users_table"
+down_revision = "005_add_users"
 branch_labels = None
 depends_on = None
 
