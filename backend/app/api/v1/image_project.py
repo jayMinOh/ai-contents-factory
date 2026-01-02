@@ -1136,7 +1136,6 @@ async def _run_compose_generation(project, db, settings):
                 prompt=project.prompt,
                 slide_number=1,
                 variant_index=0,
-                status="completed",
             )
             db.add(generated_image)
 
