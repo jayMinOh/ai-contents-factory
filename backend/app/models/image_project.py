@@ -136,6 +136,12 @@ class ImageProject(Base, TimestampMixin):
         nullable=True,
     )
 
+    # Compose mode fields
+    compose_image_temp_ids: Mapped[Optional[list]] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
     aspect_ratio: Mapped[str] = mapped_column(
         String(10),
         nullable=False,

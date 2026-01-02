@@ -52,9 +52,9 @@ class ReferenceImageBase64(BaseModel):
 class ImageProjectCreate(BaseModel):
     """Schema for creating an image project."""
     title: Optional[str] = Field(None, max_length=255)
-    content_type: str = Field(..., pattern=r"^(single|carousel|story)$")
-    purpose: str = Field(..., pattern=r"^(ad|info|lifestyle)$")
-    method: str = Field(..., pattern=r"^(reference|prompt)$")
+    content_type: str = Field(..., pattern=r"^(single|carousel|story|compose)$")
+    purpose: str = Field(..., pattern=r"^(ad|info|lifestyle|compose)$")
+    method: str = Field(..., pattern=r"^(reference|prompt|compose)$")
     generation_mode: str = Field(default="bulk", pattern=r"^(step_by_step|bulk)$")
     brand_id: Optional[str] = None
     product_id: Optional[str] = None
@@ -64,6 +64,9 @@ class ImageProjectCreate(BaseModel):
     aspect_ratio: str = Field(default="1:1", pattern=r"^\d+:\d+$")
     # Reference images for style guidance (base64 encoded)
     reference_images_base64: Optional[List[ReferenceImageBase64]] = None
+    # Compose mode fields
+    compose_image_temp_ids: Optional[List[str]] = None  # Uploaded image temp IDs for compose
+    compose_prompt: Optional[str] = None  # Enhanced prompt for compose mode
 
 
 class ImageProjectUpdate(BaseModel):

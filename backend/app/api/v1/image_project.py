@@ -124,8 +124,8 @@ async def create_image_project(
     # Generate title if not provided
     title = project_data.title
     if not title:
-        content_type_kr = {"single": "단일", "carousel": "캐러셀", "story": "세로형"}
-        purpose_kr = {"ad": "광고", "info": "정보", "lifestyle": "라이프스타일"}
+        content_type_kr = {"single": "단일", "carousel": "캐러셀", "story": "세로형", "compose": "합성"}
+        purpose_kr = {"ad": "광고", "info": "정보", "lifestyle": "라이프스타일", "compose": "편집"}
         title = f"{content_type_kr.get(project_data.content_type, project_data.content_type)} {purpose_kr.get(project_data.purpose, project_data.purpose)} 이미지"
 
     # Upload reference images to cloud storage if provided
@@ -158,9 +158,10 @@ async def create_image_project(
         product_id=project_data.product_id,
         reference_analysis_id=project_data.reference_analysis_id,
         storyboard_data=project_data.storyboard_data,
-        prompt=project_data.prompt,
+        prompt=project_data.prompt if project_data.content_type != "compose" else project_data.compose_prompt,
         aspect_ratio=project_data.aspect_ratio,
         reference_image_urls=reference_image_urls,
+        compose_image_temp_ids=project_data.compose_image_temp_ids,
         status="draft",
         current_step=1,
         current_slide=1,
@@ -1055,6 +1056,80 @@ PRODUCT INTEGRATION INSTRUCTIONS:
 
 # ========== Background Image Generation ==========
 
+async def _run_compose_generation(project, db, settings):
+    """
+    Handle compose mode image generation.
+    Uses uploaded images and enhanced prompt to generate composed image.
+    """
+    from app.services.image_editor import get_image_editor
+    from app.services.temp_image_store import get_temp_image_store
+
+    logger.info(f"Starting compose generation for project {project.id}")
+
+    try:
+        # Get temp image store
+        temp_store = get_temp_image_store()
+
+        # Load images from temp store
+        compose_images = []
+        if project.compose_image_temp_ids:
+            for temp_id in project.compose_image_temp_ids:
+                img_data = await temp_store.get_image(temp_id)
+                if img_data:
+                    compose_images.append(img_data)
+                    logger.info(f"Loaded compose image: {temp_id}")
+                else:
+                    logger.warning(f"Compose image not found: {temp_id}")
+
+        if not compose_images:
+            logger.error(f"No compose images found for project {project.id}")
+            project.status = "failed"
+            project.error_message = "업로드된 이미지를 찾을 수 없습니다."
+            await db.commit()
+            return
+
+        # Get image editor
+        editor = get_image_editor()
+
+        # Generate composed image
+        logger.info(f"Generating compose image with prompt: {project.prompt[:100] if project.prompt else 'NONE'}...")
+
+        gen_result = await editor.edit_with_product(
+            edit_prompt=project.prompt or "",
+            product_images=compose_images,
+            aspect_ratio=project.aspect_ratio,
+        )
+
+        if gen_result and gen_result.image_url:
+            # Create generated image record
+            generated_image = GeneratedImage(
+                id=str(uuid.uuid4()),
+                image_project_id=project.id,
+                image_url=gen_result.image_url,
+                prompt=project.prompt,
+                slide_number=1,
+                variant_index=0,
+                status="completed",
+            )
+            db.add(generated_image)
+
+            project.status = "completed"
+            project.completed_at = datetime.utcnow()
+            logger.info(f"Compose generation completed for project {project.id}")
+        else:
+            project.status = "failed"
+            project.error_message = "이미지 생성에 실패했습니다."
+            logger.error(f"Compose generation failed for project {project.id}")
+
+        await db.commit()
+
+    except Exception as e:
+        logger.error(f"Compose generation error for project {project.id}: {e}")
+        project.status = "failed"
+        project.error_message = str(e)
+        await db.commit()
+
+
 async def run_background_image_generation(project_id: str):
     """
     Background task to generate all images for a project.
@@ -1085,6 +1160,11 @@ async def run_background_image_generation(project_id: str):
             # Update status to generating
             project.status = "generating"
             await db.commit()
+
+            # Handle compose mode separately
+            if project.content_type == "compose":
+                await _run_compose_generation(project, db, settings)
+                return
 
             # Get storyboard data
             storyboard = project.storyboard_data or {}

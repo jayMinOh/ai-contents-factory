@@ -1229,9 +1229,9 @@ export interface ReferenceImageBase64 {
 
 export interface ImageProjectCreate {
   title?: string;
-  content_type: "single" | "carousel" | "story";
-  purpose: "ad" | "info" | "lifestyle";
-  method: "reference" | "prompt";
+  content_type: "single" | "carousel" | "story" | "compose";
+  purpose: "ad" | "info" | "lifestyle" | "compose";
+  method: "reference" | "prompt" | "compose";
   generation_mode?: "step_by_step" | "bulk";
   brand_id?: string;
   product_id?: string;
@@ -1241,6 +1241,9 @@ export interface ImageProjectCreate {
   aspect_ratio?: string;
   // Reference images for style guidance (base64 encoded)
   reference_images_base64?: ReferenceImageBase64[];
+  // Compose mode fields
+  compose_image_temp_ids?: string[];
+  compose_prompt?: string;
 }
 
 export interface GenerateImagesRequest {

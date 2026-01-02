@@ -669,7 +669,7 @@ function CreatePageContent() {
     }
   };
 
-  // Generate composed image
+  // Generate composed image (background processing)
   const handleGenerateComposeImage = async () => {
     if (!enhancedPrompt) {
       toast.error("먼저 프롬프트를 구체화해주세요.");
@@ -677,21 +677,30 @@ function CreatePageContent() {
     }
 
     setIsGeneratingCompose(true);
-    toast.info("AI가 이미지를 생성하고 있습니다...");
+    toast.info("이미지 생성을 시작합니다...");
 
     try {
-      const result = await studioApi.editImageWithProduct({
-        image_temp_ids: composeUploadedImages.map((img) => img.tempId || "").filter(Boolean),
-        prompt: enhancedPrompt.enhanced_prompt,
+      // Create image project for compose mode
+      const project = await imageProjectApi.create({
+        content_type: "compose",
+        purpose: "compose",
+        method: "compose",
+        generation_mode: "bulk",
         aspect_ratio: config.aspectRatio,
+        compose_image_temp_ids: composeUploadedImages.map((img) => img.tempId || "").filter(Boolean),
+        compose_prompt: enhancedPrompt.enhanced_prompt,
       });
 
-      setComposeGeneratedImage(result.image_url);
-      toast.success("이미지 생성이 완료되었습니다!");
+      // Start background generation
+      await imageProjectApi.startBackgroundGeneration(project.id);
+
+      toast.success("이미지 생성이 시작되었습니다. 히스토리에서 진행 상황을 확인하세요.");
+
+      // Navigate to history page
+      router.push("/history");
     } catch (error) {
       console.error("Image generation failed:", error);
-      toast.error("이미지 생성에 실패했습니다. 다시 시도해주세요.");
-    } finally {
+      toast.error("이미지 생성 시작에 실패했습니다.");
       setIsGeneratingCompose(false);
     }
   };
