@@ -32,6 +32,8 @@ import {
   Trash2,
   Upload,
   ImagePlus,
+  Download,
+  Type,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { brandApi, referenceApi, storyboardApi, imageProjectApi, studioApi, AnalysisResult, HookPoint, EdgePoint, EmotionalTrigger, SellingPoint, Recommendation, ContentStoryboard, StoryboardSlide, ImageProject, GeneratedImage, GenerateSingleSectionResponse, ConceptSuggestion } from "@/lib/api";
@@ -1763,13 +1765,13 @@ function CreatePageContent() {
                               <Loader2 className="w-6 h-6 text-white animate-spin" />
                             </div>
                           )}
-                          <button
-                            onClick={() => handleRemoveComposeImage(index)}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors shadow-lg z-10"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
                         </div>
+                        <button
+                          onClick={() => handleRemoveComposeImage(index)}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors shadow-lg z-10"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                         {/* Analysis Result Badge */}
                         {!img.isAnalyzing && img.detectedType && (
                           <div className="mt-1.5 text-center">
@@ -2704,9 +2706,9 @@ function CreatePageContent() {
                         onClick={() => {
                           setComposeGeneratedImage(null);
                         }}
-                        className="btn-secondary px-6 py-3"
+                        className="btn-secondary px-6 py-3 flex items-center gap-2"
                       >
-                        <RefreshCw className="w-4 h-4 mr-1" />
+                        <RefreshCw className="w-4 h-4" />
                         다시 생성
                       </button>
                       <a
@@ -2714,8 +2716,9 @@ function CreatePageContent() {
                         download="generated-image.png"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn-primary px-6 py-3"
+                        className="btn-primary px-6 py-3 flex items-center gap-2"
                       >
+                        <Download className="w-4 h-4" />
                         다운로드
                       </a>
                       <Link
@@ -2726,8 +2729,9 @@ function CreatePageContent() {
                             imageIndex: 0,
                           }));
                         }}
-                        className="btn-primary px-6 py-3"
+                        className="btn-primary px-6 py-3 flex items-center gap-2"
                       >
+                        <Type className="w-4 h-4" />
                         텍스트 편집
                       </Link>
                     </div>
