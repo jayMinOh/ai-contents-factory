@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Wand2,
 } from "lucide-react";
 import { imageProjectApi, type ImageProject, type GeneratedImage } from "@/lib/api";
 import { toast } from "sonner";
@@ -34,11 +35,13 @@ const translations = {
       single: "단일 이미지",
       carousel: "캐러셀",
       story: "세로형",
+      compose: "이미지 합성",
     },
     purpose: {
       ad: "광고/홍보",
       info: "정보성",
       lifestyle: "일상/감성",
+      compose: "합성/편집",
     },
     status: {
       draft: "준비 중",
@@ -282,12 +285,14 @@ export default function HistoryDetailPage() {
     single: { label: t.contentType.single, icon: ImageIcon, gradient: "from-accent-500 to-accent-600" },
     carousel: { label: t.contentType.carousel, icon: Layers, gradient: "from-violet-500 to-purple-600" },
     story: { label: t.contentType.story, icon: Smartphone, gradient: "from-cyan-500 to-blue-600" },
+    compose: { label: t.contentType.compose, icon: Wand2, gradient: "from-glow-500 to-glow-600" },
   };
 
   const purposeLabels = {
     ad: { label: t.purpose.ad, icon: Megaphone },
     info: { label: t.purpose.info, icon: BookOpen },
     lifestyle: { label: t.purpose.lifestyle, icon: Sparkles },
+    compose: { label: t.purpose.compose, icon: Wand2 },
   };
 
   const statusLabels: Record<string, { label: string; color: string; bgColor: string }> = {

@@ -1109,7 +1109,7 @@ async def _run_compose_generation(project, db, settings):
 
         gen_result = await editor.edit_with_product(
             edit_prompt=project.prompt or "",
-            product_images=compose_images,
+            images_data=compose_images,
             aspect_ratio=project.aspect_ratio,
         )
 
