@@ -1115,8 +1115,7 @@ async def _run_compose_generation(project, db, settings):
 
         if gen_result and gen_result.get("image_data"):
             # Upload image to COS
-            from app.services.cloud_storage import get_cloud_storage
-            cloud_storage = get_cloud_storage()
+            from app.services.cloud_storage import cloud_storage
 
             image_data = gen_result["image_data"]
             mime_type = gen_result.get("mime_type", "image/png")
