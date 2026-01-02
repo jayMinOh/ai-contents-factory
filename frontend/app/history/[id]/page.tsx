@@ -98,11 +98,13 @@ const translations = {
       single: "Single Image",
       carousel: "Carousel",
       story: "Story",
+      compose: "Image Compose",
     },
     purpose: {
       ad: "Ad/Promo",
       info: "Information",
       lifestyle: "Lifestyle",
+      compose: "Compose/Edit",
     },
     status: {
       draft: "Preparing",
@@ -302,11 +304,11 @@ export default function HistoryDetailPage() {
     failed: { label: t.status.failed, color: "text-red-500", bgColor: "bg-red-500/10" },
   };
 
-  const contentType = contentTypeLabels[project.content_type];
-  const purpose = purposeLabels[project.purpose];
+  const contentType = contentTypeLabels[project.content_type as keyof typeof contentTypeLabels] || contentTypeLabels.single;
+  const purpose = purposeLabels[project.purpose as keyof typeof purposeLabels] || purposeLabels.ad;
   const status = statusLabels[project.status] || statusLabels.draft;
-  const ContentIcon = contentType.icon;
-  const PurposeIcon = purpose.icon;
+  const ContentIcon = contentType?.icon || ImageIcon;
+  const PurposeIcon = purpose?.icon || Megaphone;
   const slides = project.storyboard_data?.slides || [];
   const slideNumbers = getSlideNumbers();
   const currentSlideData = slides.find((s) => s.slide_number === selectedSlide);
