@@ -1436,11 +1436,11 @@ async def start_background_generation(
             detail=f"Image project not found: {project_id}"
         )
 
-    # Check storyboard exists
+    # Check storyboard exists (skip for compose mode)
     storyboard = project.storyboard_data or {}
     slides = storyboard.get("slides", [])
 
-    if not slides:
+    if not slides and project.content_type != "compose":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No storyboard slides found. Generate storyboard first."
@@ -1454,11 +1454,14 @@ async def start_background_generation(
     # Start background task
     background_tasks.add_task(run_background_image_generation, project_id)
 
+    # For compose mode, total_slides is 1
+    total_slides = len(slides) if slides else 1
+
     return StartBackgroundGenerationResponse(
         project_id=project_id,
         status="generating",
-        message=f"Image generation started for {len(slides)} slides. Check status with GET /image-projects/{project_id}",
-        total_slides=len(slides),
+        message=f"Image generation started for {total_slides} slides. Check status with GET /image-projects/{project_id}",
+        total_slides=total_slides,
     )
 
 

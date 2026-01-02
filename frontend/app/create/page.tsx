@@ -2668,9 +2668,9 @@ function CreatePageContent() {
                         setEnhancedPrompt(null);
                         setStep(3);
                       }}
-                      className="btn-secondary px-6 py-3"
+                      className="btn-secondary px-6 py-3 flex items-center gap-2"
                     >
-                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      <ChevronLeft className="w-4 h-4" />
                       다시 수정
                     </button>
                     <button
