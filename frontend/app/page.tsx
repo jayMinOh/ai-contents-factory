@@ -15,6 +15,7 @@ import {
   Zap,
   Target,
   Loader2,
+  Wand2,
 } from "lucide-react";
 import { imageProjectApi, referenceApi, type ImageProject } from "@/lib/api";
 
@@ -34,6 +35,14 @@ const contentTypes = [
     desc: "2~10장 세트",
     color: "electric",
     gradient: "from-electric-500 to-electric-600",
+  },
+  {
+    type: "compose",
+    icon: Wand2,
+    label: "이미지 합성/편집",
+    desc: "배경 합성, 이미지 편집",
+    color: "purple",
+    gradient: "from-purple-500 to-purple-600",
   },
 ];
 
